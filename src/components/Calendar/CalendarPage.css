@@ -47,6 +47,10 @@
   font-weight: 600;
 }
 
+.calendar-page-import-button {
+  margin-left: auto;
+}
+
 .calendar-page-body {
   display: grid;
   grid-template-columns: 1fr;

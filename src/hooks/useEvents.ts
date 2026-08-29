@@ -47,5 +47,21 @@ export function useEvents() {
     await reload();
   };
 
-  return { events, loading, reload, createEvent, updateEvent, deleteEvent };
+  const importEvents = async (drafts: EventDraft[]) => {
+    const now = new Date().toISOString();
+    for (const draft of drafts) {
+      await dbPutEvent({
+        ...draft,
+        id: crypto.randomUUID(),
+        warnings: draft.warnings ?? [],
+        memory_checked_at: null,
+        miss_count: 0,
+        created_at: now,
+        updated_at: now,
+      });
+    }
+    await reload();
+  };
+
+  return { events, loading, reload, createEvent, updateEvent, deleteEvent, importEvents };
 }

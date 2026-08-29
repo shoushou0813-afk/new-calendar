@@ -1,0 +1,141 @@
+.import-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  z-index: 60;
+}
+
+.import-dialog {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-panel);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.import-dialog h3 {
+  font-size: 18px;
+}
+
+.import-dialog-hint {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.import-dialog-file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.import-dialog-category {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.import-dialog-category select {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.import-dialog-count {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.import-dialog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.import-dialog-list li {
+  border-bottom: 1px solid var(--border);
+}
+
+.import-dialog-list li:last-child {
+  border-bottom: none;
+}
+
+.import-dialog-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.import-dialog-item-date {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.import-dialog-item-title {
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-dialog-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.import-dialog-done {
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.import-dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.import-dialog-actions button:first-child {
+  flex: 1;
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  padding: 10px;
+  font-weight: 600;
+}
+
+.import-dialog-actions button:first-child:disabled {
+  opacity: 0.6;
+}
+
+.import-dialog-cancel {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 16px;
+}

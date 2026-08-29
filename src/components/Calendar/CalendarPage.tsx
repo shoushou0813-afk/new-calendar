@@ -8,19 +8,21 @@ import { toEventInput } from '../../lib/eventMapper';
 import { MonthView } from './MonthView';
 import { EventCard } from '../EventList/EventCard';
 import { EventForm } from '../EventForm/EventForm';
+import { ImportDialog } from '../Import/ImportDialog';
 import type { EventDraft, EventRow } from '../../types/event';
 import './CalendarPage.css';
 
 type Tab = 'calendar' | 'noEvidence';
 
 export function CalendarPage() {
-  const { events, loading, createEvent, updateEvent, deleteEvent } = useEvents();
+  const { events, loading, createEvent, updateEvent, deleteEvent, importEvents } = useEvents();
   const { categories, addCategory } = useCategories();
 
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [tab, setTab] = useState<Tab>('calendar');
   const [editingEvent, setEditingEvent] = useState<EventRow | 'new' | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const dayEvents = useMemo(
     () => events.filter((e) => isSameDay(parseISO(e.date), selectedDate)).sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
@@ -59,6 +61,9 @@ export function CalendarPage() {
         </button>
         <button type="button" className={tab === 'noEvidence' ? 'is-active' : ''} onClick={() => setTab('noEvidence')}>
           裏付けのない予定 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
+        </button>
+        <button type="button" className="calendar-page-import-button" onClick={() => setShowImport(true)}>
+          インポート
         </button>
       </nav>
 
@@ -110,6 +115,10 @@ export function CalendarPage() {
           onSave={handleSave}
           onCancel={() => setEditingEvent(null)}
         />
+      )}
+
+      {showImport && (
+        <ImportDialog categories={categories} onImport={importEvents} onClose={() => setShowImport(false)} />
       )}
     </div>
   );
