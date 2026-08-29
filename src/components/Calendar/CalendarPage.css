@@ -1,0 +1,125 @@
+.calendar-page {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.calendar-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.calendar-page-header h1 {
+  font-size: 20px;
+}
+
+.calendar-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.calendar-page-header-actions button {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text-h);
+}
+
+.calendar-page-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.calendar-page-tabs button {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.calendar-page-tabs button.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+
+.calendar-page-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.calendar-page-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 720px) {
+  .calendar-page-body {
+    grid-template-columns: 3fr 2fr;
+    align-items: start;
+  }
+}
+
+.calendar-page-day-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calendar-page-day-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calendar-page-day-panel-header h2 {
+  font-size: 16px;
+}
+
+.calendar-page-day-panel-header button {
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calendar-page-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calendar-page-hint {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.calendar-page-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

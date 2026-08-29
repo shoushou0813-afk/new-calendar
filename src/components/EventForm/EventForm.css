@@ -1,0 +1,129 @@
+.event-form-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.event-form {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-panel);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event-form h3 {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.event-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.event-form input,
+.event-form select,
+.event-form textarea {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.event-form .required {
+  color: var(--danger);
+}
+
+.event-form-time-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.event-form-add-category {
+  display: flex;
+  gap: 6px;
+  margin-top: -6px;
+}
+
+.event-form-add-category input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.event-form-add-category button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-h);
+}
+
+.event-form-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.event-form-checkbox input {
+  width: auto;
+}
+
+.event-form-hint {
+  font-size: 12px;
+  color: var(--text);
+  margin: -6px 0 0;
+}
+
+.event-form-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.event-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.event-form-actions button[type='submit'] {
+  flex: 1;
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  padding: 10px;
+  font-weight: 600;
+}
+
+.event-form-actions button[type='submit']:disabled {
+  opacity: 0.6;
+}
+
+.event-form-cancel {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 16px;
+}

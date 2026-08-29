@@ -1,0 +1,97 @@
+.month-view {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.month-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.month-view-header button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: var(--text-h);
+}
+
+.month-view-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.month-view-weekdays div {
+  text-align: center;
+  padding: 4px 0;
+}
+
+.month-view-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.month-view-day {
+  aspect-ratio: 1 / 1;
+  min-height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px;
+  gap: 4px;
+  text-align: left;
+  color: var(--text-h);
+}
+
+.month-view-day.is-outside {
+  opacity: 0.4;
+}
+
+.month-view-day.is-today .month-view-day-number {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.month-view-day.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.month-view-day-number {
+  font-size: 13px;
+}
+
+.month-view-day-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.dot-plain {
+  background: var(--warn);
+}
+
+.month-view-day-flag {
+  font-size: 10px;
+  color: var(--warn);
+  margin-top: auto;
+}
