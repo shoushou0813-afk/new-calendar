@@ -1,20 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DEFAULT_CATEGORIES } from '../lib/validation';
-import { supabase } from '../lib/supabaseClient';
+import { dbAddCategory, dbGetAllCategories } from '../lib/localDb';
 
-export function useCategories(userId: string | undefined) {
+export function useCategories() {
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!userId) return;
     setLoading(true);
-    const { data, error } = await supabase.from('categories').select('name').order('created_at', { ascending: true });
-    if (!error && data) {
-      setCustomCategories(data.map((row) => row.name));
-    }
+    setCustomCategories(await dbGetAllCategories());
     setLoading(false);
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     reload();
@@ -26,11 +22,10 @@ export function useCategories(userId: string | undefined) {
   ];
 
   const addCategory = async (name: string) => {
-    if (!userId) return;
     const trimmed = name.trim();
     if (!trimmed || categories.includes(trimmed)) return;
-    const { error } = await supabase.from('categories').insert({ user_id: userId, name: trimmed });
-    if (!error) await reload();
+    await dbAddCategory(trimmed);
+    await reload();
   };
 
   return { categories, loading, addCategory };

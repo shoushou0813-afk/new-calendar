@@ -11,7 +11,7 @@ export function toEventInput(row: EventRow | EventDraft): EventInput {
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     sourceUrl: row.source_url,
-    sourceImagePath: row.source_image_path,
+    sourceImagePath: row.image ? 'local-image' : null,
     note: row.note,
     hasAlarm: row.has_alarm,
     timeConfirmed: row.time_confirmed,

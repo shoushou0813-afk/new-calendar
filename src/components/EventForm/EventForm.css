@@ -89,10 +89,13 @@
   width: auto;
 }
 
-.event-form-hint {
-  font-size: 12px;
-  color: var(--text);
-  margin: -6px 0 0;
+.event-form-image-preview {
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: -4px;
 }
 
 .event-form-error {

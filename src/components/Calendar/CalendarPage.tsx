@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format, isSameDay, parseISO, startOfMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { useAuth } from '../../hooks/useAuth';
 import { useCategories } from '../../hooks/useCategories';
 import { useEvents } from '../../hooks/useEvents';
 import { hasNoEvidence } from '../../lib/validation';
@@ -15,9 +14,8 @@ import './CalendarPage.css';
 type Tab = 'calendar' | 'noEvidence';
 
 export function CalendarPage() {
-  const { user, signOut } = useAuth();
-  const { events, loading, error, createEvent, updateEvent, deleteEvent } = useEvents(user?.id);
-  const { categories, addCategory } = useCategories(user?.id);
+  const { events, loading, createEvent, updateEvent, deleteEvent } = useEvents();
+  const { categories, addCategory } = useCategories();
 
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -33,8 +31,6 @@ export function CalendarPage() {
     () => events.filter((e) => hasNoEvidence(toEventInput(e))).sort((a, b) => a.date.localeCompare(b.date)),
     [events],
   );
-
-  if (!user) return null;
 
   const handleSave = async (draft: EventDraft) => {
     if (editingEvent && editingEvent !== 'new') {
@@ -54,12 +50,7 @@ export function CalendarPage() {
     <div className="calendar-page">
       <header className="calendar-page-header">
         <h1>予定時刻ミス検知カレンダー</h1>
-        <div className="calendar-page-header-actions">
-          <span className="calendar-page-user">{user.email}</span>
-          <button type="button" onClick={() => signOut()}>
-            ログアウト
-          </button>
-        </div>
+        <p className="calendar-page-storage-note">この端末のブラウザ内にのみ保存されます</p>
       </header>
 
       <nav className="calendar-page-tabs">
@@ -70,8 +61,6 @@ export function CalendarPage() {
           裏付けのない予定 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
         </button>
       </nav>
-
-      {error && <p className="calendar-page-error">{error}</p>}
 
       {tab === 'calendar' ? (
         <div className="calendar-page-body">
@@ -113,7 +102,6 @@ export function CalendarPage() {
 
       {editingEvent && (
         <EventForm
-          userId={user.id}
           categories={categories}
           defaultDate={selectedDate}
           initialEvent={editingEvent === 'new' ? undefined : editingEvent}

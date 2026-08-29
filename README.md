@@ -8,34 +8,23 @@
 ## スタック
 
 - React 19 + TypeScript + Vite
-- Supabase（DB・認証・ストレージ）
+- ブラウザの IndexedDB（データはこの端末・このブラウザ内にのみ保存。アカウント登録不要）
 - date-fns（日付計算）
 - Vitest（バリデーションロジックの単体テスト）
 
+データはサーバーに送信されず、その端末・ブラウザだけに保存される。複数端末で同期したり、
+バックエンドに保存したい場合は `supabase/migrations/0001_init.sql` に Supabase 版のスキーマ
+（`events` / `categories` テーブル、認証、ストレージ）を用意してあるので、そちらに切り替える
+ことも可能。
+
 ## セットアップ
 
-1. 依存関係のインストール
+```sh
+npm install
+npm run dev
+```
 
-   ```sh
-   npm install
-   ```
-
-2. Supabase プロジェクトを作成し、`supabase/migrations/0001_init.sql` を実行する
-   （Supabase Dashboard の SQL Editor に貼り付けて実行するか、Supabase CLI の
-   `supabase db push` を利用）。`events` / `categories` テーブルと `event-images`
-   ストレージバケット、RLS ポリシーが作成される。
-
-3. `.env.example` を `.env.local` にコピーし、Supabase の URL と anon key を設定する
-
-   ```sh
-   cp .env.example .env.local
-   ```
-
-4. 開発サーバーを起動
-
-   ```sh
-   npm run dev
-   ```
+これだけで起動する。アカウント登録や環境変数の設定は不要。
 
 ## スクリプト
 
@@ -60,8 +49,17 @@ validateEvent(event: EventInput, userHistory: EventInput[], now?: Date): Warning
 - R6 遠い未来（60日以上先）の予定は R1/R3/R4 の閾値を厳しめにし、添付を促すリマインダーを追加
 
 保存はブロックせず、警告は「〇〇に修正する」／「このままで合っています」で解消し、
-`events.warnings` に履歴として記録する。一度「合っています」を選ぶと `time_confirmed`
+イベントの `warnings` に履歴として記録する。一度「合っています」を選ぶと `time_confirmed`
 が立ち、時刻を変更しない限り同じ警告は再表示されない。
 
-`memory_checked_at` / `miss_count` カラムは、将来の記憶テスト機能のために予約されている
+`memory_checked_at` / `miss_count` フィールドは、将来の記憶テスト機能のために予約されている
 （今回は未使用）。
+
+## データの保存先
+
+`src/lib/localDb.ts` がブラウザの IndexedDB を薄くラップしている。予定は `events`
+オブジェクトストア、カテゴリは `categories` オブジェクトストアに保存される。チケット画像は
+Blob としてそのままレコードに保存する（外部ストレージ不要）。
+
+ブラウザのデータを消去する（プライベートブラウジングを終了する、サイトデータをクリアする等）
+と保存した予定も失われる点に注意。

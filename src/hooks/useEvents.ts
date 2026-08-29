@@ -1,53 +1,51 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { dbDeleteEvent, dbGetAllEvents, dbPutEvent } from '../lib/localDb';
 import type { EventDraft, EventRow } from '../types/event';
 
-export function useEvents(userId: string | undefined) {
+export function useEvents() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (!userId) return;
     setLoading(true);
-    const { data, error: fetchError } = await supabase.from('events').select('*').order('date', { ascending: true });
-    if (fetchError) {
-      setError(fetchError.message);
-    } else {
-      setError(null);
-      setEvents(data as EventRow[]);
-    }
+    const rows = await dbGetAllEvents();
+    setEvents(rows.sort((a, b) => a.date.localeCompare(b.date) || a.starts_at.localeCompare(b.starts_at)));
     setLoading(false);
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
   const createEvent = async (draft: EventDraft) => {
-    if (!userId) throw new Error('not authenticated');
-    const { data, error: insertError } = await supabase
-      .from('events')
-      .insert({ ...draft, user_id: userId })
-      .select('*')
-      .single();
-    if (insertError) throw insertError;
+    const now = new Date().toISOString();
+    const row: EventRow = {
+      ...draft,
+      id: crypto.randomUUID(),
+      warnings: draft.warnings ?? [],
+      memory_checked_at: null,
+      miss_count: 0,
+      created_at: now,
+      updated_at: now,
+    };
+    await dbPutEvent(row);
     await reload();
-    return data as EventRow;
+    return row;
   };
 
   const updateEvent = async (id: string, patch: Partial<EventDraft>) => {
-    const { data, error: updateError } = await supabase.from('events').update(patch).eq('id', id).select('*').single();
-    if (updateError) throw updateError;
+    const existing = events.find((e) => e.id === id);
+    if (!existing) throw new Error('event not found');
+    const updated: EventRow = { ...existing, ...patch, updated_at: new Date().toISOString() };
+    await dbPutEvent(updated);
     await reload();
-    return data as EventRow;
+    return updated;
   };
 
   const deleteEvent = async (id: string) => {
-    const { error: deleteError } = await supabase.from('events').delete().eq('id', id);
-    if (deleteError) throw deleteError;
+    await dbDeleteEvent(id);
     await reload();
   };
 
-  return { events, loading, error, reload, createEvent, updateEvent, deleteEvent };
+  return { events, loading, reload, createEvent, updateEvent, deleteEvent };
 }

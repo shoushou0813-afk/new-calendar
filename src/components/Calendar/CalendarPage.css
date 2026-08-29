@@ -21,20 +21,9 @@
   font-size: 20px;
 }
 
-.calendar-page-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
+.calendar-page-storage-note {
+  font-size: 12px;
   color: var(--text);
-}
-
-.calendar-page-header-actions button {
-  border: 1px solid var(--border);
-  background: var(--bg-panel);
-  border-radius: 8px;
-  padding: 6px 12px;
-  color: var(--text-h);
 }
 
 .calendar-page-tabs {
@@ -56,11 +45,6 @@
   border-color: var(--accent);
   color: white;
   font-weight: 600;
-}
-
-.calendar-page-error {
-  color: var(--danger);
-  font-size: 13px;
 }
 
 .calendar-page-body {

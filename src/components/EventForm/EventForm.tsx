@@ -1,15 +1,13 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { validateEvent, type EventInput, type Warning, type WarningLogEntry } from '../../lib/validation';
 import { appendWarningLog } from '../../lib/warningsLog';
 import { toEventInput } from '../../lib/eventMapper';
-import { uploadEventImage } from '../../lib/storage';
 import { WarningDialog } from '../WarningDialog/WarningDialog';
 import type { EventDraft, EventRow } from '../../types/event';
 import './EventForm.css';
 
 interface EventFormProps {
-  userId: string;
   categories: string[];
   defaultDate: Date;
   initialEvent?: EventRow;
@@ -30,7 +28,7 @@ interface FormState {
   note: string;
   hasAlarm: boolean;
   timeConfirmed: boolean;
-  sourceImagePath: string | null;
+  image: Blob | null;
 }
 
 function toFormState(event: EventRow | undefined, defaultDate: Date, defaultCategory: string): FormState {
@@ -46,7 +44,7 @@ function toFormState(event: EventRow | undefined, defaultDate: Date, defaultCate
       note: event.note ?? '',
       hasAlarm: event.has_alarm,
       timeConfirmed: event.time_confirmed,
-      sourceImagePath: event.source_image_path,
+      image: event.image,
     };
   }
   return {
@@ -60,7 +58,7 @@ function toFormState(event: EventRow | undefined, defaultDate: Date, defaultCate
     note: '',
     hasAlarm: false,
     timeConfirmed: false,
-    sourceImagePath: null,
+    image: null,
   };
 }
 
@@ -73,16 +71,28 @@ function toEventInputFromForm(form: FormState): EventInput {
     startsAt: form.startsAt,
     endsAt: form.endsAt || null,
     sourceUrl: form.sourceUrl || null,
-    sourceImagePath: form.sourceImagePath,
+    sourceImagePath: form.image ? 'local-image' : null,
     note: form.note || null,
     hasAlarm: form.hasAlarm,
     timeConfirmed: form.timeConfirmed,
   };
 }
 
-export function EventForm({ userId, categories, defaultDate, initialEvent, history, onAddCategory, onSave, onCancel }: EventFormProps) {
+function ImagePreview({ image }: { image: Blob }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(image);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [image]);
+
+  if (!url) return null;
+  return <img src={url} alt="添付されたチケット画像" className="event-form-image-preview" />;
+}
+
+export function EventForm({ categories, defaultDate, initialEvent, history, onAddCategory, onSave, onCancel }: EventFormProps) {
   const [form, setForm] = useState<FormState>(() => toFormState(initialEvent, defaultDate, categories[0] ?? 'その他'));
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [addingCategory, setAddingCategory] = useState(false);
   const [pendingWarnings, setPendingWarnings] = useState<Warning[] | null>(null);
@@ -106,10 +116,6 @@ export function EventForm({ userId, categories, defaultDate, initialEvent, histo
     setSaving(true);
     setFormError(null);
     try {
-      let sourceImagePath = finalForm.sourceImagePath;
-      if (imageFile) {
-        sourceImagePath = await uploadEventImage(userId, imageFile);
-      }
       const draft: EventDraft = {
         title: finalForm.title,
         category: finalForm.category,
@@ -118,7 +124,7 @@ export function EventForm({ userId, categories, defaultDate, initialEvent, histo
         starts_at: finalForm.startsAt,
         ends_at: finalForm.endsAt || null,
         source_url: finalForm.sourceUrl || null,
-        source_image_path: sourceImagePath,
+        image: finalForm.image,
         note: finalForm.note || null,
         has_alarm: finalForm.hasAlarm,
         time_confirmed: finalForm.timeConfirmed,
@@ -239,9 +245,9 @@ export function EventForm({ userId, categories, defaultDate, initialEvent, histo
 
         <label>
           チケット画像
-          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} />
+          <input type="file" accept="image/*" onChange={(e) => updateField('image', e.target.files?.[0] ?? null)} />
         </label>
-        {form.sourceImagePath && !imageFile && <p className="event-form-hint">画像が添付されています</p>}
+        {form.image && <ImagePreview image={form.image} />}
 
         <label>
           メモ

@@ -1,9 +1,8 @@
 import type { WarningLogEntry } from '../lib/validation';
 
-/** Row shape as stored in Supabase (see supabase/migrations/0001_init.sql). */
+/** Row shape as stored in the browser's IndexedDB (see src/lib/localDb.ts). */
 export interface EventRow {
   id: string;
-  user_id: string;
   title: string;
   category: string;
   date: string;
@@ -11,7 +10,8 @@ export interface EventRow {
   starts_at: string;
   ends_at: string | null;
   source_url: string | null;
-  source_image_path: string | null;
+  /** Ticket image, stored as a Blob directly in IndexedDB (no external storage). */
+  image: Blob | null;
   note: string | null;
   has_alarm: boolean;
   time_confirmed: boolean;
@@ -26,7 +26,7 @@ export interface EventRow {
 
 export type EventDraft = Omit<
   EventRow,
-  'id' | 'user_id' | 'warnings' | 'memory_checked_at' | 'miss_count' | 'created_at' | 'updated_at'
+  'id' | 'warnings' | 'memory_checked_at' | 'miss_count' | 'created_at' | 'updated_at'
 > & {
   warnings?: WarningLogEntry[];
 };
