@@ -14,6 +14,8 @@ export interface AppSettings {
   /** 作業してよい時間帯 HH:mm */
   workStart: string;
   workEnd: string;
+  /** ネット保存の合言葉(空ならこの端末だけに保存) */
+  cloudToken: string;
   /** 1回の作業ブロックの最大長(分) */
   maxBlockMinutes: number;
   /** ブロックの間に入れる休憩(分) */
@@ -27,6 +29,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   googleCalendarId: 'primary',
   googleImportCategory: 'その他',
   anthropicApiKey: '',
+  cloudToken: '',
   workStart: '09:00',
   workEnd: '22:00',
   maxBlockMinutes: 50,

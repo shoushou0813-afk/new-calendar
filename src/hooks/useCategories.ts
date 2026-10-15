@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DEFAULT_CATEGORIES } from '../lib/validation';
 import { dbAddCategory, dbGetAllCategories } from '../lib/localDb';
+import { CLOUD_CHANGED_EVENT } from '../lib/cloud/cloudSync';
 
 export function useCategories() {
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -14,6 +15,10 @@ export function useCategories() {
 
   useEffect(() => {
     reload();
+    // ネット保存から新しいデータが届いたら読み直す
+    const onCloud = () => void reload();
+    window.addEventListener(CLOUD_CHANGED_EVENT, onCloud);
+    return () => window.removeEventListener(CLOUD_CHANGED_EVENT, onCloud);
   }, [reload]);
 
   const categories = [

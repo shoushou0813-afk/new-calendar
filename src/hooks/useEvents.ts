@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { dbAddGoogleTombstone, dbDeleteEvent, dbGetAllEvents, dbPutEvent } from '../lib/localDb';
+import { CLOUD_CHANGED_EVENT } from '../lib/cloud/cloudSync';
 import type { EventDraft, EventRow } from '../types/event';
 
 export function useEvents() {
@@ -15,6 +16,10 @@ export function useEvents() {
 
   useEffect(() => {
     reload();
+    // ネット保存から新しいデータが届いたら読み直す
+    const onCloud = () => void reload();
+    window.addEventListener(CLOUD_CHANGED_EVENT, onCloud);
+    return () => window.removeEventListener(CLOUD_CHANGED_EVENT, onCloud);
   }, [reload]);
 
   const createEvent = async (draft: EventDraft) => {

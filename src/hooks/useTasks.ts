@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { dbDeleteTask, dbGetAllTasks, dbPutTask } from '../lib/localDb';
+import { CLOUD_CHANGED_EVENT } from '../lib/cloud/cloudSync';
 import type { Task, TaskDraft } from '../types/task';
 
 export function useTasks() {
@@ -15,6 +16,10 @@ export function useTasks() {
 
   useEffect(() => {
     reload();
+    // ネット保存から新しいデータが届いたら読み直す
+    const onCloud = () => void reload();
+    window.addEventListener(CLOUD_CHANGED_EVENT, onCloud);
+    return () => window.removeEventListener(CLOUD_CHANGED_EVENT, onCloud);
   }, [reload]);
 
   const createTask = async (draft: TaskDraft) => {

@@ -14,7 +14,8 @@
 - Google Identity Services + Google Calendar API v3（Googleカレンダー同期）
 - Claude API（`@anthropic-ai/sdk`、AIプランナー）
 
-データはサーバーに送信されず、その端末・ブラウザだけに保存される。複数端末で同期したり、
+データは基本的にその端末・ブラウザだけに保存される。「設定」でネット保存の合言葉を入れると、
+Vercel 上の保存場所にも保存され、他の端末や Claude からも読み書きできる(後述)。複数端末で同期したり、
 バックエンドに保存したい場合は `supabase/migrations/0001_init.sql` に Supabase 版のスキーマ
 （`events` / `categories` テーブル、認証、ストレージ）を用意してあるので、そちらに切り替える
 ことも可能。
@@ -113,3 +114,25 @@ Blob としてそのままレコードに保存する（外部ストレージ不
 AIプランナーを使うには「設定」で Claude の APIキー（[Claude Console](https://platform.claude.com/) で発行）を入力する。
 キーはこのブラウザの localStorage にだけ保存され、ブラウザから Anthropic の API に直接送られる。
 個人利用向けの方式なので、共有PCでは入力しないこと。
+
+## ネット保存(スマホ・PC・Claude で共有)
+
+`api/data.ts` が Vercel Function として動き、データを Vercel Blob(非公開)に JSON 1ファイルで保存する。
+
+- `GET /api/data` … 全データ / `POST /api/data {"ops": [...]}` … 変更(追加・更新・削除)を適用
+- どちらも `Authorization: Bearer <APP_TOKEN>` が必要。APP_TOKEN は Vercel のプロジェクトの環境変数
+- 同時に書き込んでも取りこぼさないよう、Blob の ETag を使って「読んだときから変わっていなければ書く」をくり返す
+- 変更の形(op)と適用は `api/_lib/cloudDoc.ts`(サーバーとアプリで共通の純粋関数)
+
+アプリ側(`src/lib/cloud/cloudSync.ts`)は端末の IndexedDB をそのまま使い、変更を「送信待ち」に貯めてから送る。
+アプリを開いたとき・画面に戻ったとき・1分ごとに最新を取りに行く。初めて合言葉を入れた端末は、
+端末にあってネットにないデータを送る。
+
+### 準備
+
+1. Vercel のプロジェクト → Storage → Create → Blob を **Private** で作り、このプロジェクトにつなぐ
+   (`BLOB_READ_WRITE_TOKEN` が自動で入る)。つないだあと再デプロイする
+2. プロジェクトの環境変数に `APP_TOKEN`(合言葉)を入れる
+3. アプリの「設定」→「ネット保存」に同じ合言葉を入れる
+
+手元から読み書きするときは `CLOUD_TOKEN=<合言葉> node scripts/cloud.mjs get` など。

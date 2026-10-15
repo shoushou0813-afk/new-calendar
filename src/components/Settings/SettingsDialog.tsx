@@ -26,6 +26,24 @@ export function SettingsDialog({ settings, categories, envClientId, onSave, onCl
         <h3>設定</h3>
 
         <fieldset>
+          <legend>ネット保存(スマホ・PC・Claudeで共有)</legend>
+          <label>
+            合言葉
+            <input
+              type="password"
+              value={draft.cloudToken}
+              onChange={(e) => set('cloudToken', e.target.value)}
+              placeholder="Claudeから受け取った合言葉"
+              autoComplete="off"
+            />
+          </label>
+          <p className="todo-hint">
+            入れると、予定・タスク・計画がネット上(あなたのVercel)に保存され、他の端末やClaudeからも読み書きできるようになります。
+            この端末にあるデータは、初回にネットへ送られます。空にすると、この端末だけの保存に戻ります。
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend>Googleカレンダー同期</legend>
           <label>
             OAuth クライアントID

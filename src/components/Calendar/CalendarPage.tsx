@@ -16,6 +16,8 @@ import { useTasks } from '../../hooks/useTasks';
 import { resolveGoogleClientId } from '../../lib/settings';
 import { runGoogleSync } from '../../lib/google/runGoogleSync';
 import { clearImportLink, readImportLink } from '../../lib/importLink';
+import { configureCloud, syncNow } from '../../lib/cloud/cloudSync';
+import { useCloudStatus } from '../../hooks/useCloudStatus';
 import type { EventDraft, EventRow } from '../../types/event';
 import './CalendarPage.css';
 
@@ -36,6 +38,12 @@ export function CalendarPage() {
   const [editingEvent, setEditingEvent] = useState<EventRow | 'new' | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [linkIcsText, setLinkIcsText] = useState<string | null>(null);
+  const cloud = useCloudStatus();
+
+  // 合言葉が設定されていればネット保存を始める
+  useEffect(() => {
+    configureCloud(settings.cloudToken);
+  }, [settings.cloudToken]);
   // 最初の予定・タスクの読み込みが終わったか(取り込み後の再読み込みでは false に戻さない)
   const [eventsReady, setEventsReady] = useState(false);
   if (!loading && !tasksLoading && !eventsReady) setEventsReady(true);
@@ -118,7 +126,17 @@ export function CalendarPage() {
     <div className="calendar-page">
       <header className="calendar-page-header">
         <h1>予定時刻ミス検知カレンダー</h1>
-        <p className="calendar-page-storage-note">この端末のブラウザ内にのみ保存されます</p>
+        {cloud.state === 'off' ? (
+          <p className="calendar-page-storage-note">この端末のブラウザ内にのみ保存されます</p>
+        ) : (
+          <button type="button" className={`calendar-page-cloud is-${cloud.state}`} onClick={() => void syncNow()} title="今すぐ同期">
+            {cloud.state === 'syncing'
+              ? '同期中…'
+              : cloud.state === 'error'
+                ? `⚠ ${cloud.error ?? '同期できませんでした'}`
+                : `ネット保存中${cloud.lastSyncedAt ? `(${format(parseISO(cloud.lastSyncedAt), 'H:mm')} 同期)` : ''}`}
+          </button>
+        )}
       </header>
 
       <nav className="calendar-page-tabs">
