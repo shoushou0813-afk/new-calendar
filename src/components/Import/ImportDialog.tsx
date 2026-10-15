@@ -18,6 +18,8 @@ interface ImportDialogProps {
   existingTasks?: Task[];
   onImport: (drafts: EventDraft[]) => Promise<void>;
   onImportTasks?: (drafts: TaskDraft[]) => Promise<void>;
+  onDeleteEvents?: (ids: string[]) => Promise<void>;
+  onDeleteTasks?: (ids: string[]) => Promise<void>;
   onClose: () => void;
 }
 
@@ -37,6 +39,9 @@ function formatMinutes(m: number): string {
 interface Loaded {
   events: ParsedIcsEvent[];
   tasks: TaskDraft[];
+  /** 削除の指定に一致した、登録済みの予定・タスク */
+  removeEvents: EventRow[];
+  removeTasks: Task[];
 }
 
 export function ImportDialog({
@@ -46,6 +51,8 @@ export function ImportDialog({
   existingTasks = [],
   onImport,
   onImportTasks,
+  onDeleteEvents,
+  onDeleteTasks,
   onClose,
 }: ImportDialogProps) {
   const existingEventKeys = new Set(existingEvents.map((e) => eventKey({ date: e.date, startsAt: e.starts_at, title: e.title })));
@@ -53,8 +60,16 @@ export function ImportDialog({
 
   const parse = (text: string): Loaded => {
     const payload = parseImportPayload(text);
-    return { events: payload.ics ? parseIcs(payload.ics) : [], tasks: payload.tasks };
+    const removeEventKeys = new Set(payload.removeEvents.map((r) => `${r.date} ${r.starts_at} ${r.title}`));
+    const removeTaskKeys = new Set(payload.removeTasks.map(taskKey));
+    return {
+      events: payload.ics ? parseIcs(payload.ics) : [],
+      tasks: payload.tasks,
+      removeEvents: onDeleteEvents ? existingEvents.filter((e) => removeEventKeys.has(`${e.date} ${e.starts_at} ${e.title}`)) : [],
+      removeTasks: onDeleteTasks ? existingTasks.filter((t) => removeTaskKeys.has(taskKey(t))) : [],
+    };
   };
+  const isEmpty = (l: Loaded) => l.events.length + l.tasks.length + l.removeEvents.length + l.removeTasks.length === 0;
   const newEventIndexes = (events: ParsedIcsEvent[]) =>
     new Set(events.map((e, i) => (existingEventKeys.has(eventKey(e)) ? -1 : i)).filter((i) => i >= 0));
   const newTaskIndexes = (tasks: TaskDraft[]) =>
@@ -64,7 +79,7 @@ export function ImportDialog({
     if (!initialText) return { loaded: null, error: null };
     try {
       const loaded = parse(initialText);
-      if (loaded.events.length === 0 && loaded.tasks.length === 0) return { loaded: null, error: '取り込みリンクに予定が入っていませんでした。' };
+      if (isEmpty(loaded)) return { loaded: null, error: '取り込みリンクの内容は、すべて取り込み済み・削除済みでした。' };
       return { loaded, error: null };
     } catch (err) {
       return { loaded: null, error: err instanceof Error ? err.message : '取り込みリンクを読めませんでした。' };
@@ -76,12 +91,15 @@ export function ImportDialog({
   const [category, setCategory] = useState(categories.includes('その他') ? 'その他' : (categories[0] ?? 'その他'));
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(initial.error);
-  const [done, setDone] = useState<{ events: number; tasks: number } | null>(null);
+  const [done, setDone] = useState<{ events: number; tasks: number; removed: number } | null>(null);
+  const [selectedRemovals, setSelectedRemovals] = useState<Set<string>>(
+    () => new Set([...(initial.loaded?.removeEvents ?? []).map((e) => e.id), ...(initial.loaded?.removeTasks ?? []).map((t) => t.id)]),
+  );
   const [pasted, setPasted] = useState('');
 
   const load = (text: string, emptyMessage: string) => {
     const next = parse(text);
-    if (next.events.length === 0 && next.tasks.length === 0) {
+    if (isEmpty(next)) {
       setError(emptyMessage);
       setLoaded(null);
       return;
@@ -89,6 +107,7 @@ export function ImportDialog({
     setLoaded(next);
     setSelected(newEventIndexes(next.events));
     setSelectedTasks(newTaskIndexes(next.tasks));
+    setSelectedRemovals(new Set([...next.removeEvents.map((e) => e.id), ...next.removeTasks.map((t) => t.id)]));
   };
 
   const handlePaste = async () => {
@@ -126,7 +145,15 @@ export function ImportDialog({
   const toggle = toggleIn(setSelected);
   const toggleTask = toggleIn(setSelectedTasks);
 
-  const totalSelected = selected.size + (onImportTasks ? selectedTasks.size : 0);
+  const toggleRemoval = (id: string) =>
+    setSelectedRemovals((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const totalSelected = selected.size + (onImportTasks ? selectedTasks.size : 0) + selectedRemovals.size;
 
   const handleImport = async () => {
     if (!loaded) return;
@@ -149,9 +176,13 @@ export function ImportDialog({
           time_confirmed: false,
         }));
       const taskDrafts = onImportTasks ? loaded.tasks.filter((_, i) => selectedTasks.has(i)) : [];
+      const removeEventIds = loaded.removeEvents.filter((e) => selectedRemovals.has(e.id)).map((e) => e.id);
+      const removeTaskIds = loaded.removeTasks.filter((t) => selectedRemovals.has(t.id)).map((t) => t.id);
       if (drafts.length > 0) await onImport(drafts);
       if (taskDrafts.length > 0) await onImportTasks!(taskDrafts);
-      setDone({ events: drafts.length, tasks: taskDrafts.length });
+      if (removeEventIds.length > 0) await onDeleteEvents!(removeEventIds);
+      if (removeTaskIds.length > 0) await onDeleteTasks!(removeTaskIds);
+      setDone({ events: drafts.length, tasks: taskDrafts.length, removed: removeEventIds.length + removeTaskIds.length });
     } catch (err) {
       setError(err instanceof Error ? err.message : '取り込みに失敗しました');
     } finally {
@@ -160,7 +191,13 @@ export function ImportDialog({
   };
 
   const doneText = done
-    ? [done.events > 0 && `${done.events}件の予定`, done.tasks > 0 && `${done.tasks}件のタスク`].filter(Boolean).join('と') + 'を取り込みました。'
+    ? [
+        done.events + done.tasks > 0 &&
+          [done.events > 0 && `${done.events}件の予定`, done.tasks > 0 && `${done.tasks}件のタスク`].filter(Boolean).join('と') + 'を取り込みました。',
+        done.removed > 0 && `${done.removed}件を削除しました。`,
+      ]
+        .filter(Boolean)
+        .join('')
     : '';
 
   return (
@@ -271,9 +308,41 @@ export function ImportDialog({
               </>
             )}
 
+            {loaded && loaded.removeEvents.length + loaded.removeTasks.length > 0 && (
+              <>
+                <p className="import-dialog-count is-remove">削除するもの {loaded.removeEvents.length + loaded.removeTasks.length}件</p>
+                <ul className="import-dialog-list">
+                  {loaded.removeEvents.map((e) => (
+                    <li key={e.id}>
+                      <label>
+                        <input type="checkbox" checked={selectedRemovals.has(e.id)} onChange={() => toggleRemoval(e.id)} />
+                        <span className="import-dialog-item-date">
+                          予定 {e.date} {e.starts_at}
+                        </span>
+                        <span className="import-dialog-item-title is-remove">{e.title}</span>
+                      </label>
+                    </li>
+                  ))}
+                  {loaded.removeTasks.map((t) => (
+                    <li key={t.id}>
+                      <label>
+                        <input type="checkbox" checked={selectedRemovals.has(t.id)} onChange={() => toggleRemoval(t.id)} />
+                        <span className="import-dialog-item-date">タスク 締切 {format(parseISO(t.deadline), 'M/d', { locale: ja })}</span>
+                        <span className="import-dialog-item-title is-remove">{t.title}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
             <div className="import-dialog-actions">
               <button type="button" onClick={handleImport} disabled={!loaded || totalSelected === 0 || importing}>
-                {importing ? '取り込み中...' : `${totalSelected}件を取り込む`}
+                {importing
+                  ? '処理中...'
+                  : selected.size + selectedTasks.size === 0
+                    ? `${selectedRemovals.size}件を削除する`
+                    : `${totalSelected}件を反映する`}
               </button>
               <button type="button" className="import-dialog-cancel" onClick={onClose} disabled={importing}>
                 キャンセル

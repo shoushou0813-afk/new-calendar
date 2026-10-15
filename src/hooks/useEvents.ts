@@ -49,6 +49,15 @@ export function useEvents() {
     await reload();
   };
 
+  const deleteEvents = async (ids: string[]) => {
+    for (const id of ids) {
+      const existing = events.find((e) => e.id === id);
+      if (existing?.google_event_id) await dbAddGoogleTombstone(existing.google_event_id);
+      await dbDeleteEvent(id);
+    }
+    await reload();
+  };
+
   const importEvents = async (drafts: EventDraft[]) => {
     const now = new Date().toISOString();
     for (const draft of drafts) {
@@ -65,5 +74,5 @@ export function useEvents() {
     await reload();
   };
 
-  return { events, loading, reload, createEvent, updateEvent, deleteEvent, importEvents };
+  return { events, loading, reload, createEvent, updateEvent, deleteEvent, deleteEvents, importEvents };
 }

@@ -166,3 +166,13 @@
   font-size: 12px;
   word-break: break-all;
 }
+
+.import-dialog-count.is-remove {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.import-dialog-item-title.is-remove {
+  text-decoration: line-through;
+  color: var(--danger);
+}

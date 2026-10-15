@@ -22,9 +22,9 @@ import './CalendarPage.css';
 type Tab = 'calendar' | 'todo' | 'noEvidence';
 
 export function CalendarPage() {
-  const { events, loading, reload, createEvent, updateEvent, deleteEvent, importEvents } = useEvents();
+  const { events, loading, reload, createEvent, updateEvent, deleteEvent, deleteEvents, importEvents } = useEvents();
   const { categories, addCategory } = useCategories();
-  const { tasks, createTask, createTasks, updateTask, deleteTask } = useTasks();
+  const { tasks, loading: tasksLoading, createTask, createTasks, updateTask, deleteTask, deleteTasks } = useTasks();
   const { settings, updateSettings } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -36,9 +36,9 @@ export function CalendarPage() {
   const [editingEvent, setEditingEvent] = useState<EventRow | 'new' | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [linkIcsText, setLinkIcsText] = useState<string | null>(null);
-  // 最初の予定読み込みが終わったか(取り込み後の再読み込みでは false に戻さない)
+  // 最初の予定・タスクの読み込みが終わったか(取り込み後の再読み込みでは false に戻さない)
   const [eventsReady, setEventsReady] = useState(false);
-  if (!loading && !eventsReady) setEventsReady(true);
+  if (!loading && !tasksLoading && !eventsReady) setEventsReady(true);
 
   // 1タップ取り込みリンク(#import=...)から開かれたら、取り込み画面をすぐ出す
   useEffect(() => {
@@ -220,7 +220,7 @@ export function CalendarPage() {
         />
       )}
 
-      {/* リンクから開いたときは、登録済みの予定を読み終えてから出す(重複チェックのため) */}
+      {/* リンクから開いたときは、登録済みの予定・タスクを読み終えてから出す(重複チェック・削除の照合のため) */}
       {showImport && (!linkIcsText || eventsReady) && (
         <ImportDialog
           categories={categories}
@@ -229,6 +229,8 @@ export function CalendarPage() {
           existingTasks={tasks}
           onImport={importEvents}
           onImportTasks={createTasks}
+          onDeleteEvents={deleteEvents}
+          onDeleteTasks={deleteTasks}
           onClose={() => {
             setShowImport(false);
             setLinkIcsText(null);

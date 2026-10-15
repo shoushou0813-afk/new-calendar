@@ -36,10 +36,15 @@ export function useTasks() {
     await reload();
   };
 
+  const deleteTasks = async (ids: string[]) => {
+    for (const id of ids) await dbDeleteTask(id);
+    await reload();
+  };
+
   const deleteTask = async (id: string) => {
     await dbDeleteTask(id);
     await reload();
   };
 
-  return { tasks, loading, reload, createTask, createTasks, updateTask, deleteTask };
+  return { tasks, loading, reload, createTask, createTasks, updateTask, deleteTask, deleteTasks };
 }
