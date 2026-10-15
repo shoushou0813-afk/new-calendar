@@ -5,7 +5,7 @@
  * どちらも Authorization: Bearer <APP_TOKEN> が必要(合言葉を知っている人だけが使える)。
  * データは Vercel Blob(非公開)に JSON 1ファイルとして保存し、ETag で同時書き込みの取りこぼしを防ぐ。
  */
-import { BlobPreconditionFailedError, get, put } from '@vercel/blob';
+import { BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
 import { applyOps, emptyDoc, isCloudOp, type CloudDoc } from './_lib/cloudDoc.js';
 
 const PATHNAME = 'calendar/data.json';
@@ -29,11 +29,22 @@ function authorized(request: Request): boolean {
   return diff === 0;
 }
 
+/**
+ * 条件付き書き込み(ifMatch)に使う ETag は head() の値を使う。get() の ETag は配信側のレスポンスヘッダーの値で、
+ * ifMatch と一致しないことがあるため。先に ETag を取ってから中身を読むので、間に誰かが書けば書き込みが失敗して読み直しになる。
+ */
 async function readDoc(): Promise<{ doc: CloudDoc; etag: string | null }> {
+  let etag: string;
+  try {
+    etag = (await head(PATHNAME)).etag;
+  } catch (err) {
+    if (err instanceof BlobNotFoundError) return { doc: emptyDoc(), etag: null };
+    throw err;
+  }
   const result = await get(PATHNAME, { access: 'private', useCache: false });
   if (!result || result.statusCode !== 200) return { doc: emptyDoc(), etag: null };
   const text = await new Response(result.stream).text();
-  return { doc: { ...emptyDoc(), ...(JSON.parse(text) as CloudDoc) }, etag: result.blob.etag };
+  return { doc: { ...emptyDoc(), ...(JSON.parse(text) as CloudDoc) }, etag };
 }
 
 async function writeDoc(doc: CloudDoc, etag: string | null): Promise<void> {
@@ -75,12 +86,13 @@ export async function POST(request: Request): Promise<Response> {
   if (!Array.isArray(rawOps)) return json({ error: 'ops must be an array' }, 400);
   const ops = rawOps.filter(isCloudOp);
 
-  // 読む → 変更を適用 → 「読んだときから誰も書き換えていなければ」書く。書き換えられていたら読み直してやり直す
+  // 読む → 変更を適用 → 「読んだときから誰も書き換えていなければ」書く。書き換えられていたら読み直してやり直す。
+  // 最後の1回は条件なしで書く(直前に読み直した最新に変更を重ねるので、取りこぼす幅はごくわずか)
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const { doc, etag } = await readDoc();
     const next = applyOps(doc, ops);
     try {
-      await writeDoc(next, etag);
+      await writeDoc(next, attempt === MAX_RETRIES - 1 ? null : etag);
       return json({ doc: next, applied: ops.length, rejected: rawOps.length - ops.length });
     } catch (err) {
       if (err instanceof BlobPreconditionFailedError) continue;
