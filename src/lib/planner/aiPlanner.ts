@@ -82,6 +82,11 @@ export async function planWithClaude(ctx: PlanningContext, apiKey: string): Prom
 /** AIの出力を信用しすぎないよう、空き時間外・重なり・存在しないタスクを取り除く。 */
 export function sanitize(raw: z.infer<typeof PlanSchema>, ctx: PlanningContext): PlanResult {
   const titles = new Map(ctx.tasks.map((t) => [t.task.id, t.task.title]));
+  const cutoffs = new Map(
+    ctx.tasks
+      .filter((t) => !t.overdue && t.daysUntilDeadline === 0 && t.task.deadline_time)
+      .map((t) => [t.task.id, toMinutes(t.task.deadline_time!)]),
+  );
   const valid = /^([01]\d|2[0-3]):[0-5]\d$/;
   const warnings = [...raw.warnings];
   const accepted: PlanItem[] = [];
@@ -98,7 +103,8 @@ export function sanitize(raw: z.infer<typeof PlanSchema>, ctx: PlanningContext):
     const title = titles.get(item.task_id);
     const insideFree = ctx.slots.some((s) => start >= s.start && end <= s.end);
     const overlaps = accepted.some((a) => start < toMinutes(a.end) && end > toMinutes(a.start));
-    if (!title || end <= start || !insideFree || overlaps) {
+    const afterDeadline = end > (cutoffs.get(item.task_id) ?? Infinity);
+    if (!title || end <= start || !insideFree || overlaps || afterDeadline) {
       dropped++;
       continue;
     }

@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { dbGetPlan, dbPutPlan } from '../../lib/localDb';
+import { usePlans } from '../../hooks/usePlans';
+import { forecastDays, type ForecastDay } from '../../lib/planner/forecast';
 import { toHHmm, toMinutes, totalMinutes } from '../../lib/planner/freeSlots';
 import { planLocally, type PlanResult } from '../../lib/planner/localPlanner';
 import { buildPlanningContext } from '../../lib/planner/planningContext';
 import type { AppSettings } from '../../lib/settings';
 import type { EventDraft, EventRow } from '../../types/event';
 import type { DayPlan, PlanItem, Task, TaskDraft } from '../../types/task';
+import { DayTodoCard, formatMinutes } from './DayTodoCard';
 import { DeadlineImportDialog } from './DeadlineImportDialog';
 import { TaskForm } from './TaskForm';
 import './Todo.css';
@@ -31,46 +33,56 @@ function itemMinutes(item: PlanItem): number {
   return toMinutes(item.end) - toMinutes(item.start);
 }
 
-function formatMinutes(m: number): string {
-  const h = Math.floor(m / 60);
-  return h > 0 ? `${h}時間${m % 60 ? `${m % 60}分` : ''}` : `${m}分`;
+type Range = 'day' | 'week' | 'month';
+const RANGE_DAYS: Record<Range, number> = { day: 1, week: 7, month: 30 };
+const RANGE_KEY = 'todo-range';
+
+function loadRange(): Range {
+  try {
+    const v = localStorage.getItem(RANGE_KEY);
+    return v === 'week' || v === 'month' ? v : 'day';
+  } catch {
+    return 'day';
+  }
 }
 
 export function TodoPage(props: TodoPageProps) {
   const { date, events, tasks, settings } = props;
   const dateKey = format(date, 'yyyy-MM-dd');
-  const [plan, setPlan] = useState<DayPlan | null>(null);
+  const { plans, savePlan: persistPlan } = usePlans();
+  const [range, setRangeState] = useState<Range>(loadRange);
   const [planning, setPlanning] = useState<'ai' | 'local' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [undo, setUndo] = useState<{ date: string; itemId: string; title: string } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | 'new' | null>(null);
   const [showDeadlineImport, setShowDeadlineImport] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setPlan(null);
-    setError(null);
-    setNotice(null);
-    dbGetPlan(dateKey).then((p) => {
-      if (!cancelled) setPlan(p);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [dateKey]);
+  const setRange = (next: Range) => {
+    setRangeState(next);
+    try {
+      localStorage.setItem(RANGE_KEY, next);
+    } catch {
+      // 保存できなくても表示の切り替えはできる
+    }
+  };
 
   const context = useMemo(
     () => buildPlanningContext({ date: dateKey, now: new Date(), tasks, events, settings }),
     [dateKey, tasks, events, settings],
   );
   const freeToday = totalMinutes(context.slots);
+  const days = useMemo(
+    () => forecastDays({ startDate: dateKey, days: RANGE_DAYS[range], now: new Date(), tasks, events, settings, savedPlans: plans }),
+    [dateKey, range, tasks, events, settings, plans],
+  );
+  const today = days[0];
+  const plan = today?.plan ?? null;
   const activeTasks = tasks.filter((t) => !t.done);
   const doneTasks = tasks.filter((t) => t.done);
 
   const savePlan = async (result: PlanResult, by: DayPlan['generated_by']) => {
-    const next: DayPlan = { date: dateKey, ...result, generated_by: by, created_at: new Date().toISOString() };
-    await dbPutPlan(next);
-    setPlan(next);
+    await persistPlan({ date: dateKey, ...result, generated_by: by, created_at: new Date().toISOString() });
   };
 
   const generate = async (mode: 'ai' | 'local') => {
@@ -95,12 +107,16 @@ export function TodoPage(props: TodoPageProps) {
     }
   };
 
-  const toggleItem = async (item: PlanItem) => {
-    if (!plan) return;
+  /** 項目のチェックを切り替える。見込みの日なら、その日の計画として保存してから記録する。 */
+  const toggleInPlan = async (dayPlan: DayPlan, itemId: string) => {
+    const item = dayPlan.items.find((i) => i.id === itemId);
+    if (!item) return;
     const nextDone = !item.done;
-    const next: DayPlan = { ...plan, items: plan.items.map((i) => (i.id === item.id ? { ...i, done: nextDone } : i)) };
-    setPlan(next);
-    await dbPutPlan(next);
+    await persistPlan({
+      ...dayPlan,
+      created_at: dayPlan.created_at || new Date().toISOString(),
+      items: dayPlan.items.map((i) => (i.id === itemId ? { ...i, done: nextDone } : i)),
+    });
     // チェックした分だけタスクの進捗(終わった時間)を進める
     const task = tasks.find((t) => t.id === item.task_id);
     if (task) {
@@ -108,11 +124,24 @@ export function TodoPage(props: TodoPageProps) {
       const spent = Math.max(0, Math.min(task.estimated_minutes, task.spent_minutes + delta));
       await props.onUpdateTask(task.id, { spent_minutes: spent, done: spent >= task.estimated_minutes });
     }
+    return { nextDone, item };
+  };
+
+  const handleToggle = async (day: ForecastDay, item: PlanItem) => {
+    const r = await toggleInPlan(day.plan, item.id);
+    setUndo(r?.nextDone ? { date: day.date, itemId: item.id, title: item.title } : null);
+  };
+
+  const handleUndo = async () => {
+    if (!undo) return;
+    const dayPlan = plans.get(undo.date);
+    setUndo(null);
+    if (dayPlan) await toggleInPlan(dayPlan, undo.itemId);
   };
 
   const addPlanToCalendar = async () => {
-    if (!plan) return;
-    const drafts: EventDraft[] = plan.items.map((item) => ({
+    if (!today) return;
+    const drafts: EventDraft[] = today.items.map((item) => ({
       title: `【作業】${item.title}`,
       category: '作業',
       date: dateKey,
@@ -141,85 +170,90 @@ export function TodoPage(props: TodoPageProps) {
     await props.onDeleteTask(task.id);
   };
 
-  const planDone = plan ? plan.items.filter((i) => i.done).reduce((s, i) => s + itemMinutes(i), 0) : 0;
-  const planTotal = plan ? plan.items.reduce((s, i) => s + itemMinutes(i), 0) : 0;
+  const rangeLabel = range === 'day' ? 'のやること' : range === 'week' ? 'から1週間' : 'から1ヶ月';
 
   return (
     <div className="todo-page">
       <section className="todo-panel">
         <div className="todo-panel-header">
-          <h2>{format(date, 'M月d日(EEE)', { locale: ja })}のTodo</h2>
-          <span className="todo-free">
-            空き時間 {formatMinutes(freeToday)}
-            {context.slots.length > 0 && `(${context.slots.map((s) => `${toHHmm(s.start)}〜${toHHmm(s.end)}`).join('、')})`}
-          </span>
+          <h2>
+            {format(date, 'M月d日(EEE)', { locale: ja })}
+            {rangeLabel}
+          </h2>
+          <div className="todo-range" role="tablist" aria-label="表示する期間">
+            {(['day', 'week', 'month'] as const).map((r) => (
+              <button key={r} type="button" role="tab" aria-selected={range === r} className={range === r ? 'is-active' : ''} onClick={() => setRange(r)}>
+                {r === 'day' ? '今日' : r === 'week' ? '1週間' : '1ヶ月'}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="todo-plan-actions">
-          <button type="button" onClick={() => generate('ai')} disabled={planning !== null || activeTasks.length === 0}>
-            {planning === 'ai' ? 'AIが計画中...' : 'AIで今日の計画を立てる'}
-          </button>
-          <button type="button" className="todo-secondary" onClick={() => generate('local')} disabled={planning !== null || activeTasks.length === 0}>
-            {planning === 'local' ? '計算中...' : 'AIなしで自動割り当て'}
-          </button>
-          {!settings.anthropicApiKey && (
-            <button type="button" className="todo-link" onClick={props.onOpenSettings}>
-              APIキーを設定
-            </button>
-          )}
-        </div>
+        {range === 'day' && (
+          <>
+            <span className="todo-free">
+              空き時間 {formatMinutes(freeToday)}
+              {context.slots.length > 0 && `(${context.slots.map((s) => `${toHHmm(s.start)}〜${toHHmm(s.end)}`).join('、')})`}
+            </span>
+            <div className="todo-plan-actions">
+              <button type="button" onClick={() => generate('ai')} disabled={planning !== null || activeTasks.length === 0}>
+                {planning === 'ai' ? 'AIが計画中...' : 'AIで計画し直す'}
+              </button>
+              <button type="button" className="todo-secondary" onClick={() => generate('local')} disabled={planning !== null || activeTasks.length === 0}>
+                {planning === 'local' ? '計算中...' : '自動で組み直す'}
+              </button>
+              {!settings.anthropicApiKey && (
+                <button type="button" className="todo-link" onClick={props.onOpenSettings}>
+                  APIキーを設定
+                </button>
+              )}
+            </div>
+          </>
+        )}
 
         {error && <p className="todo-error">{error}</p>}
         {notice && <p className="todo-notice">{notice}</p>}
-
-        {!plan ? (
-          <p className="todo-hint">
-            {activeTasks.length === 0
-              ? 'まず下の「タスク」に締切のあるやることを追加してください。'
-              : 'ボタンを押すと、締切と空き時間からこの日にやることを決めます。'}
+        {undo && (
+          <p className="todo-undo">
+            「{undo.title}」を完了にしました
+            <button type="button" className="todo-link" onClick={() => void handleUndo()}>
+              元に戻す
+            </button>
           </p>
-        ) : (
+        )}
+
+        {activeTasks.length === 0 && !plan?.items.length ? (
+          <p className="todo-hint">まず下の「タスク」に締切のあるやることを追加してください。</p>
+        ) : range === 'day' && today ? (
           <>
             <p className="todo-summary">
-              <span className="todo-badge">{plan.generated_by === 'ai' ? 'AI' : '自動'}</span>
-              {plan.summary}
+              <span className="todo-badge">{today.source === 'forecast' ? '自動の見込み' : plan?.generated_by === 'ai' ? 'AI' : '自動'}</span>
+              {plan?.summary}
             </p>
-            {plan.warnings.length > 0 && (
+            {plan && plan.warnings.length > 0 && (
               <ul className="todo-warnings">
                 {plan.warnings.map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
               </ul>
             )}
-            {plan.items.length > 0 && (
-              <>
-                <div className="todo-progress">
-                  <div className="todo-progress-bar" style={{ width: `${planTotal ? (planDone / planTotal) * 100 : 0}%` }} />
-                  <span>
-                    {formatMinutes(planDone)} / {formatMinutes(planTotal)}
-                  </span>
-                </div>
-                <ul className="todo-items">
-                  {plan.items.map((item) => (
-                    <li key={item.id} className={item.done ? 'is-done' : ''}>
-                      <label>
-                        <input type="checkbox" checked={item.done} onChange={() => void toggleItem(item)} />
-                        <span className="todo-item-time">
-                          {item.start}〜{item.end}
-                        </span>
-                        <span className="todo-item-body">
-                          <span className="todo-item-title">{item.title}</span>
-                          <span className="todo-item-reason">{item.reason}</span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-                <button type="button" className="todo-secondary" onClick={() => void addPlanToCalendar()}>
-                  この計画をカレンダーに入れる
-                </button>
-              </>
+            <DayTodoCard day={today} onToggle={(d, i) => void handleToggle(d, i)} />
+            {today.items.length > 0 && (
+              <button type="button" className="todo-secondary" onClick={() => void addPlanToCalendar()}>
+                この日のやることをカレンダーに入れる
+              </button>
             )}
+          </>
+        ) : (
+          <>
+            <p className="todo-hint">
+              保存した計画がない日は、締切に間に合うよう自動で割り振った見込みです。前の日の分を予定どおり終えた前提で計算しています。
+            </p>
+            <div className="day-todo-list">
+              {days.map((d) => (
+                <DayTodoCard key={d.date} day={d} compact onToggle={(day, i) => void handleToggle(day, i)} />
+              ))}
+            </div>
           </>
         )}
       </section>

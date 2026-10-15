@@ -152,6 +152,37 @@ describe('planLocally', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it('今日の締切時刻がある作業は、その時刻までに終わる枠にだけ入れる', () => {
+    const ctx = buildPlanningContext({
+      date: '2026-10-20',
+      now: morning,
+      tasks: [task('es', '2026-10-20', 180, { deadline_time: '12:00' }), task('other', '2026-10-20', 60)],
+      events: [],
+      settings,
+    });
+    const result = planLocally(ctx);
+    const es = result.items.filter((i) => i.task_id === 'es');
+    expect(es.length).toBeGreaterThan(0);
+    for (const item of es) expect(toMinutes(item.end)).toBeLessThanOrEqual(toMinutes('12:00'));
+    // 締切時刻のあるほうを先に置く
+    expect(result.items[0].task_id).toBe('es');
+    // 12時までに180分は入りきらないので警告が出る
+    expect(result.warnings.some((w) => w.includes('es'))).toBe(true);
+    // 12時以降の枠は他のタスクに使える
+    expect(result.items.some((i) => i.task_id === 'other' && toMinutes(i.start) >= toMinutes('12:00'))).toBe(true);
+  });
+
+  it('今日の締切時刻を過ぎたタスクは「締切を過ぎた」扱いになる', () => {
+    const ctx = buildPlanningContext({
+      date: '2026-10-20',
+      now: new Date(2026, 9, 20, 13, 0),
+      tasks: [task('es', '2026-10-20', 60, { deadline_time: '12:00' })],
+      events: [],
+      settings,
+    });
+    expect(ctx.tasks[0].overdue).toBe(true);
+  });
+
   it('間に合わないタスクは警告する', () => {
     const ctx = buildPlanningContext({ date: '2026-10-20', now: morning, tasks: [task('big', '2026-10-20', 1000)], events: [], settings });
     const result = planLocally(ctx);

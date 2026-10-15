@@ -94,6 +94,10 @@ export async function dbGetPlan(date: string): Promise<DayPlan | null> {
   return plan ?? null;
 }
 
+export async function dbGetAllPlans(): Promise<DayPlan[]> {
+  return withStore<DayPlan[]>(PLANS_STORE, 'readonly', (store) => store.getAll() as IDBRequest<DayPlan[]>);
+}
+
 export async function dbPutPlan(plan: DayPlan): Promise<void> {
   await withStore(PLANS_STORE, 'readwrite', (store) => store.put(plan));
 }

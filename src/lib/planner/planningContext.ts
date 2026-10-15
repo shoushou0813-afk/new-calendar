@@ -82,11 +82,12 @@ export function buildPlanningContext(params: {
 
   const infos: TaskPlanningInfo[] = activeTasks.map((task) => {
     const daysUntilDeadline = differenceInCalendarDays(parseISO(task.deadline), planDate);
+    const timePassed = isToday && daysUntilDeadline === 0 && !!task.deadline_time && toMinutes(task.deadline_time) <= minutesOfDay(now);
     return {
       task,
       remaining: task.estimated_minutes - task.spent_minutes,
       daysUntilDeadline,
-      overdue: daysUntilDeadline < 0,
+      overdue: daysUntilDeadline < 0 || timePassed,
       mandatoryToday: 0,
       paceToday: 0,
       shortage: 0,

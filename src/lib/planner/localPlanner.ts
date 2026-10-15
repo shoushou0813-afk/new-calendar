@@ -1,5 +1,5 @@
 import type { PlanItem } from '../../types/task';
-import { toHHmm, type Slot } from './freeSlots';
+import { toHHmm, toMinutes, type Slot } from './freeSlots';
 import type { PlanningContext, TaskPlanningInfo } from './planningContext';
 
 export interface PlanResult {
@@ -19,6 +19,7 @@ function compareTasks(a: TaskPlanningInfo, b: TaskPlanningInfo): number {
   return (
     Number(b.overdue) - Number(a.overdue) ||
     a.task.deadline.localeCompare(b.task.deadline) ||
+    (a.task.deadline_time ?? '99').localeCompare(b.task.deadline_time ?? '99') ||
     PRIORITY_ORDER[a.task.priority] - PRIORITY_ORDER[b.task.priority]
   );
 }
@@ -98,10 +99,15 @@ function layout(
 
   for (const info of ordered) {
     let left = minutesFor.get(info.task.id) ?? 0;
+    // 今日が締切で時刻も決まっているタスクは、その時刻までに終わる枠にしか入れない
+    const cutoff = !info.overdue && info.daysUntilDeadline === 0 && info.task.deadline_time ? toMinutes(info.task.deadline_time) : Infinity;
     while (left > 0 && slotIdx < free.length) {
       const slot = free[slotIdx];
-      const room = slot.end - slot.start;
+      if (slot.start >= cutoff) break;
+      const room = Math.min(slot.end, cutoff) - slot.start;
       if (room < Math.min(MIN_CHUNK, left)) {
+        // 締切時刻で切れた枠なら、これ以降の枠はもっと遅いので諦める(枠自体は次のタスクに残す)
+        if (slot.end > cutoff) break;
         slotIdx++;
         continue;
       }

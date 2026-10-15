@@ -465,3 +465,126 @@
   color: var(--warn);
   background: var(--warn-bg);
 }
+
+.todo-range {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--bg);
+}
+
+.todo-panel .todo-range button {
+  background: none;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-weight: 500;
+}
+
+.todo-panel .todo-range button.is-active {
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+
+.todo-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-h);
+  background: var(--accent-bg);
+  padding: 6px 6px 6px 12px;
+  border-radius: 8px;
+}
+
+.day-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.day-todo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.day-todo.is-compact {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.day-todo.is-compact.is-today {
+  border-color: var(--accent);
+}
+
+.day-todo.is-compact .todo-items li label {
+  padding: 6px 8px;
+}
+
+.day-todo.is-compact .todo-hint {
+  font-size: 12px;
+}
+
+.day-todo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.day-todo-date {
+  font-weight: 700;
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.day-todo-today {
+  margin-left: 6px;
+  font-size: 11px;
+  color: white;
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.day-todo-total {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.day-todo-deadlines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.day-todo-deadlines li {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.day-todo-done {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.day-todo-done .todo-items {
+  width: 100%;
+}
+
+.todo-undo button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
