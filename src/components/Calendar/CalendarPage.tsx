@@ -226,7 +226,9 @@ export function CalendarPage() {
           categories={categories}
           initialText={linkIcsText ?? undefined}
           existingEvents={events}
+          existingTasks={tasks}
           onImport={importEvents}
+          onImportTasks={createTasks}
           onClose={() => {
             setShowImport(false);
             setLinkIcsText(null);
