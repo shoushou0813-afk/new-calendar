@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { differenceInCalendarDays, format, parseISO } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, isToday, parseISO, startOfToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { usePlans } from '../../hooks/usePlans';
 import { forecastDays, type ForecastDay } from '../../lib/planner/forecast';
@@ -9,13 +9,14 @@ import { buildPlanningContext } from '../../lib/planner/planningContext';
 import type { AppSettings } from '../../lib/settings';
 import type { EventDraft, EventRow } from '../../types/event';
 import type { DayPlan, PlanItem, Task, TaskDraft } from '../../types/task';
+import { DayTimeline } from './DayTimeline';
 import { DayTodoCard, formatMinutes } from './DayTodoCard';
+import { QuickScheduleDialog } from './QuickScheduleDialog';
 import { DeadlineImportDialog } from './DeadlineImportDialog';
 import { TaskForm } from './TaskForm';
 import './Todo.css';
 
 interface TodoPageProps {
-  date: Date;
   events: EventRow[];
   tasks: Task[];
   settings: AppSettings;
@@ -24,6 +25,7 @@ interface TodoPageProps {
   onUpdateTask: (id: string, patch: Partial<TaskDraft>) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onReplacePlanEvents: (date: string, drafts: EventDraft[]) => Promise<void>;
+  onImportEvents: (drafts: EventDraft[]) => Promise<void>;
   onOpenSettings: () => void;
 }
 
@@ -47,7 +49,10 @@ function loadRange(): Range {
 }
 
 export function TodoPage(props: TodoPageProps) {
-  const { date, events, tasks, settings } = props;
+  const { events, tasks, settings } = props;
+  // Todoは今日を基本にする(カレンダーで選んだ日付とは別。‹ › で移動できる)
+  const [date, setDate] = useState(startOfToday);
+  const [showQuick, setShowQuick] = useState(false);
   const dateKey = format(date, 'yyyy-MM-dd');
   const { plans, savePlan: persistPlan } = usePlans();
   const [range, setRangeState] = useState<Range>(loadRange);
@@ -176,10 +181,23 @@ export function TodoPage(props: TodoPageProps) {
     <div className="todo-page">
       <section className="todo-panel">
         <div className="todo-panel-header">
-          <h2>
-            {format(date, 'M月d日(EEE)', { locale: ja })}
-            {rangeLabel}
-          </h2>
+          <div className="todo-date-nav">
+            <button type="button" onClick={() => setDate((d) => addDays(d, -1))} aria-label="前の日">
+              ‹
+            </button>
+            <h2>
+              {format(date, 'M月d日(EEE)', { locale: ja })}
+              {rangeLabel}
+            </h2>
+            <button type="button" onClick={() => setDate((d) => addDays(d, 1))} aria-label="次の日">
+              ›
+            </button>
+            {!isToday(date) && (
+              <button type="button" onClick={() => setDate(startOfToday())}>
+                今日
+              </button>
+            )}
+          </div>
           <div className="todo-range" role="tablist" aria-label="表示する期間">
             {(['day', 'week', 'month'] as const).map((r) => (
               <button key={r} type="button" role="tab" aria-selected={range === r} className={range === r ? 'is-active' : ''} onClick={() => setRange(r)}>
@@ -222,10 +240,11 @@ export function TodoPage(props: TodoPageProps) {
           </p>
         )}
 
-        {activeTasks.length === 0 && !plan?.items.length ? (
-          <p className="todo-hint">まず下の「タスク」に締切のあるやることを追加してください。</p>
-        ) : range === 'day' && today ? (
+        {range === 'day' && today ? (
           <>
+            {activeTasks.length === 0 && (
+              <p className="todo-hint">締切のあるやることは、下の「タスク」に追加すると空き時間に自動で入ります。</p>
+            )}
             <p className="todo-summary">
               <span className="todo-badge">{today.source === 'forecast' ? '自動の見込み' : plan?.generated_by === 'ai' ? 'AI' : '自動'}</span>
               {plan?.summary}
@@ -237,7 +256,10 @@ export function TodoPage(props: TodoPageProps) {
                 ))}
               </ul>
             )}
-            <DayTodoCard day={today} onToggle={(d, i) => void handleToggle(d, i)} />
+            <DayTimeline day={today} events={events} onToggle={(d, i) => void handleToggle(d, i)} />
+            <button type="button" className="todo-secondary" onClick={() => setShowQuick(true)}>
+              1日の流れをまとめて入力
+            </button>
             {today.items.length > 0 && (
               <button type="button" className="todo-secondary" onClick={() => void addPlanToCalendar()}>
                 この日のやることをカレンダーに入れる
@@ -323,6 +345,10 @@ export function TodoPage(props: TodoPageProps) {
           </details>
         )}
       </section>
+
+      {showQuick && (
+        <QuickScheduleDialog date={dateKey} onImport={props.onImportEvents} onClose={() => setShowQuick(false)} />
+      )}
 
       {showDeadlineImport && (
         <DeadlineImportDialog

@@ -187,7 +187,6 @@ export function CalendarPage() {
         </div>
       ) : tab === 'todo' ? (
         <TodoPage
-          date={selectedDate}
           events={events}
           tasks={tasks}
           settings={settings}
@@ -196,6 +195,7 @@ export function CalendarPage() {
           onUpdateTask={updateTask}
           onDeleteTask={deleteTask}
           onReplacePlanEvents={replacePlanEvents}
+          onImportEvents={importEvents}
           onOpenSettings={() => setShowSettings(true)}
         />
       ) : (
