@@ -20,7 +20,7 @@ import './MonthView.css';
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
 /** 1マスに表示する予定の数(これを超えたら「+N」) */
-const MAX_CHIPS = 3;
+const MAX_CHIPS = 4;
 
 /** 予定の色分け: 締切は赤、作業ブロックは紫、それ以外はカテゴリごとに決まった色 */
 function chipClass(e: EventRow): string {

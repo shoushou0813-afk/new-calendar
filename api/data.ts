@@ -47,9 +47,12 @@ async function writeDoc(doc: CloudDoc, etag: string | null): Promise<void> {
   });
 }
 
-/** Vercel で Blob の保存場所をプロジェクトにつなぐと、BLOB_READ_WRITE_TOKEN が自動で入る */
+/**
+ * Vercel で Blob の保存場所をプロジェクトにつなぐと、BLOB_STORE_ID(OIDC認証)か
+ * BLOB_READ_WRITE_TOKEN(従来の方式)が自動で入る。認証そのものは SDK がやってくれる。
+ */
 function storageReady(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
 }
 
 export async function GET(request: Request): Promise<Response> {

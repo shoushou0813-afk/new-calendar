@@ -82,7 +82,8 @@
 /* スマホ幅:7列が画面に収まるよう余白を詰める */
 @media (max-width: 480px) {
   .month-view {
-    padding: 10px;
+    padding: 8px 4px;
+    margin: 0 -8px;
   }
 
   .month-view-grid {
@@ -91,13 +92,14 @@
 
   .month-view-day {
     aspect-ratio: auto;
-    min-height: 76px;
-    padding: 3px 2px;
+    min-height: 104px;
+    padding: 4px 2px;
     border-radius: 6px;
   }
 
   .month-view-day-number {
-    font-size: 12px;
+    font-size: 14px;
+    font-weight: 600;
     padding-left: 2px;
   }
 
@@ -173,8 +175,12 @@
 
 @media (max-width: 480px) {
   .month-view-chip {
-    font-size: 9px;
-    line-height: 14px;
+    font-size: 10.5px;
+    line-height: 17px;
     padding: 0 2px;
+  }
+
+  .month-view-more {
+    font-size: 11px;
   }
 }
