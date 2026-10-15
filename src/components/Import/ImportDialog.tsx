@@ -1,21 +1,39 @@
 import { useState } from 'react';
 import { parseIcs, type ParsedIcsEvent } from '../../lib/icsImport';
-import type { EventDraft } from '../../types/event';
+import type { EventDraft, EventRow } from '../../types/event';
 import './ImportDialog.css';
 
 interface ImportDialogProps {
   categories: string[];
+  /** 取り込みリンクから開いたときの .ics テキスト */
+  initialText?: string;
+  /** 登録済みの予定(同じ日時・タイトルの予定は最初からチェックを外す) */
+  existingEvents?: EventRow[];
   onImport: (drafts: EventDraft[]) => Promise<void>;
   onClose: () => void;
 }
 
-export function ImportDialog({ categories, onImport, onClose }: ImportDialogProps) {
-  const [parsedEvents, setParsedEvents] = useState<ParsedIcsEvent[] | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+function eventKey(e: { date: string; startsAt: string; title: string }): string {
+  return `${e.date} ${e.startsAt} ${e.title}`;
+}
+
+export function ImportDialog({ categories, initialText, existingEvents = [], onImport, onClose }: ImportDialogProps) {
+  const existingKeys = new Set(existingEvents.map((e) => eventKey({ date: e.date, startsAt: e.starts_at, title: e.title })));
+  const initialParsed = initialText ? parseIcs(initialText) : null;
+  const [parsedEvents, setParsedEvents] = useState<ParsedIcsEvent[] | null>(
+    initialParsed && initialParsed.length > 0 ? initialParsed : null,
+  );
+  const [selected, setSelected] = useState<Set<number>>(() => selectNew(initialParsed ?? []));
   const [category, setCategory] = useState(categories.includes('その他') ? 'その他' : (categories[0] ?? 'その他'));
   const [importing, setImporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    initialParsed && initialParsed.length === 0 ? '取り込みリンクに予定が入っていませんでした。' : null,
+  );
   const [done, setDone] = useState<number | null>(null);
+
+  function selectNew(events: ParsedIcsEvent[]): Set<number> {
+    return new Set(events.map((e, i) => (existingKeys.has(eventKey(e)) ? -1 : i)).filter((i) => i >= 0));
+  }
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -29,7 +47,7 @@ export function ImportDialog({ categories, onImport, onClose }: ImportDialogProp
         return;
       }
       setParsedEvents(events);
-      setSelected(new Set(events.map((_, i) => i)));
+      setSelected(selectNew(events));
     } catch {
       setError('ファイルの読み込みに失敗しました。');
     }
@@ -90,6 +108,7 @@ export function ImportDialog({ categories, onImport, onClose }: ImportDialogProp
           </>
         ) : (
           <>
+            {!initialText && (
             <label className="import-dialog-file">
               .ics ファイルを選択
               <input
@@ -101,6 +120,7 @@ export function ImportDialog({ categories, onImport, onClose }: ImportDialogProp
                 }}
               />
             </label>
+            )}
 
             {error && <p className="import-dialog-error">{error}</p>}
 
@@ -128,7 +148,10 @@ export function ImportDialog({ categories, onImport, onClose }: ImportDialogProp
                         <span className="import-dialog-item-date">
                           {event.date} {event.startsAt}
                         </span>
-                        <span className="import-dialog-item-title">{event.title}</span>
+                        <span className="import-dialog-item-title">
+                          {event.title}
+                          {existingKeys.has(eventKey(event)) && <span className="import-dialog-item-dup">登録済み</span>}
+                        </span>
                       </label>
                     </li>
                   ))}

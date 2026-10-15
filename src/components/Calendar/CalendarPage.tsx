@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format, isSameDay, parseISO, startOfMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useCategories } from '../../hooks/useCategories';
@@ -15,6 +15,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { useTasks } from '../../hooks/useTasks';
 import { resolveGoogleClientId } from '../../lib/settings';
 import { runGoogleSync } from '../../lib/google/runGoogleSync';
+import { clearImportLink, readImportLink } from '../../lib/importLink';
 import type { EventDraft, EventRow } from '../../types/event';
 import './CalendarPage.css';
 
@@ -34,6 +35,31 @@ export function CalendarPage() {
   const [tab, setTab] = useState<Tab>('calendar');
   const [editingEvent, setEditingEvent] = useState<EventRow | 'new' | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [linkIcsText, setLinkIcsText] = useState<string | null>(null);
+  // 最初の予定読み込みが終わったか(取り込み後の再読み込みでは false に戻さない)
+  const [eventsReady, setEventsReady] = useState(false);
+  if (!loading && !eventsReady) setEventsReady(true);
+
+  // 1タップ取り込みリンク(#import=...)から開かれたら、取り込み画面をすぐ出す
+  useEffect(() => {
+    const handle = () => {
+      if (!window.location.hash.startsWith('#import=')) return;
+      readImportLink(window.location.hash)
+        .then((text) => {
+          if (text === null) return;
+          setLinkIcsText(text);
+          setShowImport(true);
+        })
+        .catch((err: unknown) =>
+          setSyncMessage({ kind: 'error', text: err instanceof Error ? err.message : '取り込みリンクを読めませんでした。' }),
+        )
+        .finally(clearImportLink);
+    };
+    handle();
+    // すでにアプリを開いているタブでリンクを開いた場合は、# だけが変わる
+    window.addEventListener('hashchange', handle);
+    return () => window.removeEventListener('hashchange', handle);
+  }, []);
 
   const dayEvents = useMemo(
     () => events.filter((e) => isSameDay(parseISO(e.date), selectedDate)).sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
@@ -193,8 +219,18 @@ export function CalendarPage() {
         />
       )}
 
-      {showImport && (
-        <ImportDialog categories={categories} onImport={importEvents} onClose={() => setShowImport(false)} />
+      {/* リンクから開いたときは、登録済みの予定を読み終えてから出す(重複チェックのため) */}
+      {showImport && (!linkIcsText || eventsReady) && (
+        <ImportDialog
+          categories={categories}
+          initialText={linkIcsText ?? undefined}
+          existingEvents={events}
+          onImport={importEvents}
+          onClose={() => {
+            setShowImport(false);
+            setLinkIcsText(null);
+          }}
+        />
       )}
     </div>
   );

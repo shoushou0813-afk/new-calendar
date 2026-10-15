@@ -23,7 +23,7 @@
 
 .month-view-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   font-size: 12px;
   color: var(--text);
   margin-bottom: 4px;
@@ -36,13 +36,15 @@
 
 .month-view-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 
 .month-view-day {
   aspect-ratio: 1 / 1;
-  min-height: 64px;
+  min-width: 0;
+  min-height: 48px;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
@@ -94,4 +96,26 @@
   font-size: 10px;
   color: var(--warn);
   margin-top: auto;
+}
+
+/* スマホ幅:7列が画面に収まるよう余白を詰める */
+@media (max-width: 480px) {
+  .month-view {
+    padding: 10px;
+  }
+
+  .month-view-grid {
+    gap: 3px;
+  }
+
+  .month-view-day {
+    aspect-ratio: auto;
+    min-height: 52px;
+    padding: 4px;
+    border-radius: 6px;
+  }
+
+  .month-view-day-flag {
+    display: none;
+  }
 }
