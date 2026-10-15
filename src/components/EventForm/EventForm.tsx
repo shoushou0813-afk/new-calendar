@@ -52,7 +52,7 @@ function toFormState(event: EventRow | undefined, defaultDate: Date, defaultCate
     category: defaultCategory,
     date: format(defaultDate, 'yyyy-MM-dd'),
     doorsAt: '',
-    startsAt: '19:00',
+    startsAt: '10:00',
     endsAt: '',
     sourceUrl: '',
     note: '',
@@ -88,11 +88,11 @@ function ImagePreview({ image }: { image: Blob }) {
   }, [image]);
 
   if (!url) return null;
-  return <img src={url} alt="添付されたチケット画像" className="event-form-image-preview" />;
+  return <img src={url} alt="添付された画像" className="event-form-image-preview" />;
 }
 
 export function EventForm({ categories, defaultDate, initialEvent, history, onAddCategory, onSave, onCancel }: EventFormProps) {
-  const [form, setForm] = useState<FormState>(() => toFormState(initialEvent, defaultDate, categories[0] ?? 'その他'));
+  const [form, setForm] = useState<FormState>(() => toFormState(initialEvent, defaultDate, categories.includes('その他') ? 'その他' : (categories[0] ?? 'その他')));
   const [newCategoryName, setNewCategoryName] = useState('');
   const [addingCategory, setAddingCategory] = useState(false);
   const [pendingWarnings, setPendingWarnings] = useState<Warning[] | null>(null);
@@ -225,11 +225,11 @@ export function EventForm({ categories, defaultDate, initialEvent, history, onAd
 
         <div className="event-form-time-row">
           <label>
-            開場
+            集合・受付
             <input type="time" value={form.doorsAt} onChange={(e) => updateField('doorsAt', e.target.value)} />
           </label>
           <label>
-            開演 <span className="required">*</span>
+            開始 <span className="required">*</span>
             <input type="time" value={form.startsAt} onChange={(e) => updateField('startsAt', e.target.value)} required />
           </label>
           <label>
@@ -239,12 +239,12 @@ export function EventForm({ categories, defaultDate, initialEvent, history, onAd
         </div>
 
         <label>
-          チケットURL・登録元URL
+          関連URL(案内・申込ページ・チケットなど)
           <input type="url" value={form.sourceUrl} onChange={(e) => updateField('sourceUrl', e.target.value)} placeholder="https://..." />
         </label>
 
         <label>
-          チケット画像
+          画像(案内・確認メール・チケットのスクショなど)
           <input type="file" accept="image/*" onChange={(e) => updateField('image', e.target.files?.[0] ?? null)} />
         </label>
         {form.image && <ImagePreview image={form.image} />}

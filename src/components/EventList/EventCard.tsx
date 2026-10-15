@@ -20,12 +20,12 @@ export function EventCard({ event, showDate, onEdit, onDelete }: EventCardProps)
         <div className="event-card-top">
           <span className="event-card-category">{event.category}</span>
           {showDate && <span className="event-card-date">{format(parseISO(event.date), 'M月d日(EEE)', { locale: ja })}</span>}
-          {noEvidence && <span className="event-card-flag">裏付けなし</span>}
+          {noEvidence && <span className="event-card-flag">情報なし</span>}
         </div>
         <div className="event-card-title">{event.title}</div>
         <div className="event-card-times">
-          {event.doors_at && <span>開場 {event.doors_at}</span>}
-          <span>開演 {event.starts_at}</span>
+          {event.doors_at && <span>集合 {event.doors_at}</span>}
+          <span>{event.starts_at === '00:00' && !event.ends_at ? '終日' : `開始 ${event.starts_at}`}</span>
           {event.ends_at && <span>終了 {event.ends_at}</span>}
         </div>
       </div>

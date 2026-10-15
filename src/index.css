@@ -78,3 +78,13 @@ textarea {
   font: inherit;
   color: inherit;
 }
+
+/* iPhone の Safari は、文字が 16px より小さい入力欄をタップすると画面を拡大してしまう。
+   スマホ幅では入力欄の文字を 16px にして、勝手にズームしないようにする */
+@media (max-width: 820px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

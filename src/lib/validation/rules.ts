@@ -100,7 +100,7 @@ export function checkFarFutureReminder(event: EventInput, now?: Date): Warning |
   const label = days >= 90 ? `${Math.round(days / 30)}ヶ月` : `${days}日`;
   return {
     rule: 'far_future_reminder',
-    message: `${label}先の予定です。チケット画像かURLを添付しておくと、後で確認できます。`,
+    message: `${label}先の予定です。案内のURLやスクショを添付しておくと、後で確認できます。`,
     inputValue: event.date,
   };
 }

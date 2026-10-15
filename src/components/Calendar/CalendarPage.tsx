@@ -129,7 +129,7 @@ export function CalendarPage() {
           今日のTodo
         </button>
         <button type="button" className={tab === 'noEvidence' ? 'is-active' : ''} onClick={() => setTab('noEvidence')}>
-          裏付けのない予定 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
+          情報が足りない予定 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
         </button>
         <button type="button" className="calendar-page-import-button" onClick={() => void handleSync()} disabled={syncing}>
           {syncing ? '同期中...' : 'Google同期'}
@@ -183,7 +183,7 @@ export function CalendarPage() {
       ) : (
         <div className="calendar-page-list">
           <p className="calendar-page-hint">
-            チケットURLも画像もメモもない予定です。まとめて見直して、必要なら情報を足しましょう。
+            URLも画像もメモもない予定です。あとで「何だっけ？」とならないよう、案内のURLやスクショ、メモを足しておきましょう。
           </p>
           {noEvidenceEvents.length === 0 ? (
             <p className="calendar-page-hint">該当する予定はありません</p>

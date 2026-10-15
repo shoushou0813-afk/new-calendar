@@ -14,11 +14,33 @@ import {
 import { ja } from 'date-fns/locale';
 import { useRef, useState, type TouchEvent } from 'react';
 import type { EventRow } from '../../types/event';
-import { hasNoEvidence } from '../../lib/validation';
-import { toEventInput } from '../../lib/eventMapper';
+import { isDeadlineEvent } from '../../lib/deadlineTasks';
 import './MonthView.css';
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+/** 1マスに表示する予定の数(これを超えたら「+N」) */
+const MAX_CHIPS = 3;
+
+/** 予定の色分け: 締切は赤、作業ブロックは紫、それ以外はカテゴリごとに決まった色 */
+function chipClass(e: EventRow): string {
+  if (isDeadlineEvent(e)) return 'chip-deadline';
+  if (e.task_id) return 'chip-work';
+  let hash = 0;
+  for (const ch of e.category) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `chip-c${hash % 6}`;
+}
+
+/** マスは狭いので、先頭の【締切】【オンライン】などは外して名前を見せる(締切は色でわかる) */
+function chipLabel(title: string): string {
+  return title.replace(/^(\s*【[^】]*】\s*)+/, '').trim() || title;
+}
+
+/** 終日の予定(0:00開始・終了なし)を先に、あとは開始時刻順 */
+function sortForCell(a: EventRow, b: EventRow): number {
+  const allDay = (e: EventRow) => (e.starts_at === '00:00' && !e.ends_at ? 0 : 1);
+  return allDay(a) - allDay(b) || a.starts_at.localeCompare(b.starts_at);
+}
 
 /** これ以上横に動かしたら「スワイプ」とみなす(px) */
 const SWIPE_THRESHOLD = 50;
@@ -92,7 +114,8 @@ export function MonthView({ month, events, selectedDate, onSelectDate, onChangeM
         {days.map((day) => {
           const key = format(day, 'yyyy-MM-dd');
           const dayEvents = eventsByDate.get(key) ?? [];
-          const noEvidenceCount = dayEvents.filter((e) => hasNoEvidence(toEventInput(e))).length;
+          const sorted = [...dayEvents].sort(sortForCell);
+          const hidden = sorted.length - MAX_CHIPS;
           return (
             <button
               type="button"
@@ -106,16 +129,15 @@ export function MonthView({ month, events, selectedDate, onSelectDate, onChangeM
                 .filter(Boolean)
                 .join(' ')}
               onClick={() => onSelectDate(day)}
+              aria-label={`${format(day, 'M月d日', { locale: ja })} ${dayEvents.length}件の予定`}
             >
               <span className="month-view-day-number">{format(day, 'd')}</span>
-              {dayEvents.length > 0 && (
-                <span className="month-view-day-dots">
-                  {dayEvents.slice(0, 4).map((e) => (
-                    <span key={e.id} className={`dot ${e.time_confirmed ? 'dot-ok' : 'dot-plain'}`} />
-                  ))}
+              {sorted.slice(0, hidden > 0 ? MAX_CHIPS - 1 : MAX_CHIPS).map((e) => (
+                <span key={e.id} className={`month-view-chip ${chipClass(e)}`}>
+                  {chipLabel(e.title)}
                 </span>
-              )}
-              {noEvidenceCount > 0 && <span className="month-view-day-flag">裏付けなし {noEvidenceCount}</span>}
+              ))}
+              {hidden > 0 && <span className="month-view-more">+{hidden + 1}</span>}
             </button>
           );
         })}
