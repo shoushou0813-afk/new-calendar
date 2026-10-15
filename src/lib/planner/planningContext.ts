@@ -1,6 +1,7 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { EventRow } from '../../types/event';
 import type { Task } from '../../types/task';
+import { isDeadlineEvent } from '../deadlineTasks';
 import type { AppSettings } from '../settings';
 import { freeSlots, toMinutes, totalMinutes, type Slot } from './freeSlots';
 
@@ -60,7 +61,8 @@ export function buildPlanningContext(params: {
   const isToday = format(now, 'yyyy-MM-dd') === date;
   const isPast = differenceInCalendarDays(planDate, now) < 0;
 
-  const eventsOn = (d: string) => events.filter((e) => e.date === d && !e.task_id);
+  // AIが入れた作業ブロックと、締切を示すだけの予定(【締切】…)は、空き時間を埋めるものとして扱わない
+  const eventsOn = (d: string) => events.filter((e) => e.date === d && !e.task_id && !isDeadlineEvent(e));
   const slotsFor = (d: string, notBefore: number) => freeSlots(eventsOn(d), settings.workStart, settings.workEnd, notBefore);
 
   const activeTasks = params.tasks.filter((t) => !t.done && t.estimated_minutes - t.spent_minutes > 0);

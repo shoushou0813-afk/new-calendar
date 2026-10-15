@@ -24,7 +24,7 @@ type Tab = 'calendar' | 'todo' | 'noEvidence';
 export function CalendarPage() {
   const { events, loading, reload, createEvent, updateEvent, deleteEvent, importEvents } = useEvents();
   const { categories, addCategory } = useCategories();
-  const { tasks, createTask, updateTask, deleteTask } = useTasks();
+  const { tasks, createTask, createTasks, updateTask, deleteTask } = useTasks();
   const { settings, updateSettings } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -174,6 +174,7 @@ export function CalendarPage() {
           tasks={tasks}
           settings={settings}
           onCreateTask={createTask}
+          onCreateTasks={createTasks}
           onUpdateTask={updateTask}
           onDeleteTask={deleteTask}
           onReplacePlanEvents={replacePlanEvents}

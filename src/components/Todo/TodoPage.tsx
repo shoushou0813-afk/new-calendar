@@ -8,6 +8,7 @@ import { buildPlanningContext } from '../../lib/planner/planningContext';
 import type { AppSettings } from '../../lib/settings';
 import type { EventDraft, EventRow } from '../../types/event';
 import type { DayPlan, PlanItem, Task, TaskDraft } from '../../types/task';
+import { DeadlineImportDialog } from './DeadlineImportDialog';
 import { TaskForm } from './TaskForm';
 import './Todo.css';
 
@@ -17,6 +18,7 @@ interface TodoPageProps {
   tasks: Task[];
   settings: AppSettings;
   onCreateTask: (draft: TaskDraft) => Promise<void>;
+  onCreateTasks: (drafts: TaskDraft[]) => Promise<void>;
   onUpdateTask: (id: string, patch: Partial<TaskDraft>) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onReplacePlanEvents: (date: string, drafts: EventDraft[]) => Promise<void>;
@@ -42,6 +44,7 @@ export function TodoPage(props: TodoPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | 'new' | null>(null);
+  const [showDeadlineImport, setShowDeadlineImport] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,9 +227,14 @@ export function TodoPage(props: TodoPageProps) {
       <section className="todo-panel">
         <div className="todo-panel-header">
           <h2>タスク(締切のあるやること)</h2>
-          <button type="button" onClick={() => setEditingTask('new')}>
-            + タスクを追加
-          </button>
+          <div className="todo-panel-header-actions">
+            <button type="button" onClick={() => setEditingTask('new')}>
+              + タスクを追加
+            </button>
+            <button type="button" className="todo-secondary" onClick={() => setShowDeadlineImport(true)}>
+              締切をまとめて追加
+            </button>
+          </div>
         </div>
         {activeTasks.length === 0 ? (
           <p className="todo-hint">未完了のタスクはありません</p>
@@ -281,6 +289,16 @@ export function TodoPage(props: TodoPageProps) {
           </details>
         )}
       </section>
+
+      {showDeadlineImport && (
+        <DeadlineImportDialog
+          events={events}
+          tasks={tasks}
+          today={format(new Date(), 'yyyy-MM-dd')}
+          onImport={props.onCreateTasks}
+          onClose={() => setShowDeadlineImport(false)}
+        />
+      )}
 
       {editingTask && (
         <TaskForm

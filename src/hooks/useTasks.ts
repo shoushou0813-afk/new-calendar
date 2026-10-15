@@ -23,6 +23,12 @@ export function useTasks() {
     await reload();
   };
 
+  const createTasks = async (drafts: TaskDraft[]) => {
+    const now = new Date().toISOString();
+    for (const draft of drafts) await dbPutTask({ ...draft, id: crypto.randomUUID(), created_at: now, updated_at: now });
+    await reload();
+  };
+
   const updateTask = async (id: string, patch: Partial<TaskDraft>) => {
     const existing = tasks.find((t) => t.id === id);
     if (!existing) throw new Error('task not found');
@@ -35,5 +41,5 @@ export function useTasks() {
     await reload();
   };
 
-  return { tasks, loading, reload, createTask, updateTask, deleteTask };
+  return { tasks, loading, reload, createTask, createTasks, updateTask, deleteTask };
 }

@@ -110,6 +110,17 @@ describe('buildPlanningContext', () => {
     expect(a.shortage + b.shortage).toBe(0);
   });
 
+  it('【締切】の予定は空き時間を埋めない(締切の目印なので)', () => {
+    const ctx = buildPlanningContext({
+      date: '2026-10-20',
+      now: morning,
+      tasks: [],
+      events: [ev('2026-10-20', '11:00', '12:00', { title: '【締切 12:00】ES提出' })],
+      settings,
+    });
+    expect(ctx.slots).toEqual([{ start: toMinutes('09:00'), end: toMinutes('18:00') }]);
+  });
+
   it('AIが入れた作業ブロック(task_id付き)は空き時間の計算に含めない', () => {
     const ctx = buildPlanningContext({
       date: '2026-10-20',
