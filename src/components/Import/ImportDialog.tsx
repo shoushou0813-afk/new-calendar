@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { parseIcs, type ParsedIcsEvent } from '../../lib/icsImport';
+import { readPastedImportLink } from '../../lib/importLink';
 import type { EventDraft, EventRow } from '../../types/event';
 import './ImportDialog.css';
 
@@ -34,6 +35,34 @@ export function ImportDialog({ categories, initialText, existingEvents = [], onI
   function selectNew(events: ParsedIcsEvent[]): Set<number> {
     return new Set(events.map((e, i) => (existingKeys.has(eventKey(e)) ? -1 : i)).filter((i) => i >= 0));
   }
+
+  const [pasted, setPasted] = useState('');
+
+  const loadText = (text: string) => {
+    const events = parseIcs(text);
+    if (events.length === 0) {
+      setError('予定が見つかりませんでした。');
+      setParsedEvents(null);
+      return;
+    }
+    setParsedEvents(events);
+    setSelected(selectNew(events));
+  };
+
+  const handlePaste = async () => {
+    setError(null);
+    setDone(null);
+    try {
+      const text = (await readPastedImportLink(pasted)) ?? (pasted.includes('BEGIN:VCALENDAR') ? pasted : null);
+      if (text === null) {
+        setError('取り込みリンクが見つかりませんでした。リンク全体を貼り付けてください。');
+        return;
+      }
+      loadText(text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '読み込みに失敗しました。');
+    }
+  };
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -120,6 +149,22 @@ export function ImportDialog({ categories, initialText, existingEvents = [], onI
                 }}
               />
             </label>
+            )}
+
+            {!initialText && !parsedEvents && (
+              <div className="import-dialog-paste">
+                <label htmlFor="import-paste">または、取り込みリンクを貼り付け</label>
+                <textarea
+                  id="import-paste"
+                  rows={3}
+                  value={pasted}
+                  onChange={(e) => setPasted(e.target.value)}
+                  placeholder="https://…/#import=… をここに貼り付け"
+                />
+                <button type="button" className="import-dialog-cancel" onClick={() => void handlePaste()} disabled={!pasted.trim()}>
+                  貼り付けたリンクを読み込む
+                </button>
+              </div>
             )}
 
             {error && <p className="import-dialog-error">{error}</p>}
