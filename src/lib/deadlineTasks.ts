@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { EventRow } from '../types/event';
 import type { Task, TaskDraft, TaskPriority } from '../types/task';
 
@@ -27,7 +27,32 @@ export function estimateMinutes(title: string): number {
   return 60;
 }
 
+/**
+ * 練習・準備が必要な予定か。
+ * - lesson: 「〜レッスン」→ レッスンまでに練習する
+ * - exam:   「本番」「試験」「検定」など → 前の日までに勉強する
+ * 締切の予定や、テストセンター(会場予約の話)は対象外。
+ */
+export function practiceKind(e: Pick<EventRow, 'title'>): 'lesson' | 'exam' | null {
+  if (isDeadlineEvent(e)) return null;
+  if (/レッスン/.test(e.title)) return 'lesson';
+  if (/本番|試験|検定|模試|(?<!Web)テスト(?!センター)/.test(e.title)) return 'exam';
+  return null;
+}
+
+function practiceTitle(title: string, kind: 'lesson' | 'exam', date: string): string {
+  const md = format(parseISO(date), 'M/d');
+  if (kind === 'lesson') {
+    const subject = title.replace(/レッスン/g, '').trim() || title;
+    return `${subject}の練習(${md}のレッスンまで)`;
+  }
+  const subject = title.replace(/本番/g, '').trim() || title;
+  return `${subject}の勉強(${md}まで)`;
+}
+
 export interface DeadlineCandidate {
+  /** submit: 提出(【締切】の予定) / practice: 練習・準備(レッスン・試験など) */
+  kind: 'submit' | 'practice';
   event: EventRow;
   draft: TaskDraft;
   /** 同じ名前・締切のタスクがすでにある */
@@ -36,8 +61,46 @@ export interface DeadlineCandidate {
   defaultChecked: boolean;
 }
 
-/** 今日以降の締切予定から、タスクにする候補を作る */
+/** 今日以降の締切予定と、練習・準備が必要な予定から、タスクにする候補を作る */
 export function deadlineCandidates(events: EventRow[], tasks: Task[], today: string): DeadlineCandidate[] {
+  return [...submitCandidates(events, tasks, today), ...practiceCandidates(events, tasks, today)].sort(
+    (a, b) =>
+      a.draft.deadline.localeCompare(b.draft.deadline) || (a.draft.deadline_time ?? '99').localeCompare(b.draft.deadline_time ?? '99'),
+  );
+}
+
+function practiceCandidates(events: EventRow[], tasks: Task[], today: string): DeadlineCandidate[] {
+  const existing = new Set(tasks.map((t) => `${t.title}|${t.deadline}`));
+  return events
+    .filter((e) => !e.task_id && e.date >= today && practiceKind(e) !== null)
+    .map((event) => {
+      const kind = practiceKind(event)!;
+      // レッスンは開始時刻まで、試験・本番は前の日の終わりまでに終わらせる
+      const deadline = kind === 'lesson' ? event.date : format(addDays(parseISO(event.date), -1), 'yyyy-MM-dd');
+      const usable = deadline >= today ? deadline : event.date;
+      const title = practiceTitle(event.title, kind, event.date);
+      const daysLeft = differenceInCalendarDays(parseISO(usable), parseISO(today));
+      const alreadyAdded = existing.has(`${title}|${usable}`);
+      return {
+        kind: 'practice' as const,
+        event,
+        alreadyAdded,
+        defaultChecked: !alreadyAdded,
+        draft: {
+          title,
+          deadline: usable,
+          deadline_time: kind === 'lesson' && event.starts_at !== '00:00' ? event.starts_at : null,
+          estimated_minutes: kind === 'lesson' ? 90 : /本番|検定/.test(event.title) ? 300 : 180,
+          spent_minutes: 0,
+          priority: daysLeft <= 3 ? ('high' as const) : ('normal' as const),
+          note: event.note,
+          done: false,
+        },
+      };
+    });
+}
+
+function submitCandidates(events: EventRow[], tasks: Task[], today: string): DeadlineCandidate[] {
   const existing = new Set(tasks.map((t) => `${t.title}|${t.deadline}`));
   return events
     .filter((e) => isDeadlineEvent(e) && !e.task_id && e.date >= today)
@@ -53,6 +116,7 @@ export function deadlineCandidates(events: EventRow[], tasks: Task[], today: str
       const priority: TaskPriority = backup ? 'low' : daysLeft <= 3 ? 'high' : 'normal';
       const alreadyAdded = existing.has(`${title}|${event.date}`);
       return {
+        kind: 'submit' as const,
         event,
         alreadyAdded,
         defaultChecked: !alreadyAdded && !backup,

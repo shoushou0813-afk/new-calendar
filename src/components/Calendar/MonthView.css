@@ -1,4 +1,7 @@
 .month-view {
+  /* 縦スクロールはブラウザに任せ、横の動きはスワイプとして受け取る */
+  touch-action: pan-y;
+  overflow: hidden;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -117,5 +120,34 @@
 
   .month-view-day-flag {
     display: none;
+  }
+}
+
+.month-view-grid.is-slide-next {
+  animation: month-slide-next 0.22s ease-out;
+}
+
+.month-view-grid.is-slide-prev {
+  animation: month-slide-prev 0.22s ease-out;
+}
+
+@keyframes month-slide-next {
+  from {
+    transform: translateX(24%);
+    opacity: 0;
+  }
+}
+
+@keyframes month-slide-prev {
+  from {
+    transform: translateX(-24%);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .month-view-grid.is-slide-next,
+  .month-view-grid.is-slide-prev {
+    animation: none;
   }
 }

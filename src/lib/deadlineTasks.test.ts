@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EventRow } from '../types/event';
 import type { Task } from '../types/task';
-import { deadlineCandidates, estimateMinutes, isDeadlineEvent, taskTitleFromEvent } from './deadlineTasks';
+import { deadlineCandidates, estimateMinutes, isDeadlineEvent, practiceKind, taskTitleFromEvent } from './deadlineTasks';
 
 function ev(title: string, date: string, starts_at = '00:00', ends_at: string | null = null, extra: Partial<EventRow> = {}): EventRow {
   return {
@@ -46,7 +46,7 @@ describe('deadlineTasks', () => {
       ],
       existing,
       '2026-10-16',
-    );
+    ).filter((c) => c.kind === 'submit');
     expect(result.map((c) => c.draft.title)).toEqual(['NTT東日本（ES・適性）', 'SCSK（IT）', 'ドコモ ES提出(予備)']);
     expect(result[0].draft).toMatchObject({ deadline: '2026-10-16', deadline_time: '12:00', priority: 'high', estimated_minutes: 180 });
     expect(result[0].defaultChecked).toBe(true);
@@ -54,5 +54,29 @@ describe('deadlineTasks', () => {
     expect(result[1].draft.deadline_time).toBeNull();
     expect(result[2]).toMatchObject({ defaultChecked: false });
     expect(result[2].draft.priority).toBe('low');
+  });
+
+  it('練習・準備が必要な予定を見分ける', () => {
+    expect(practiceKind({ title: 'ピアノレッスン' })).toBe('lesson');
+    expect(practiceKind({ title: '宅建本番' })).toBe('exam');
+    expect(practiceKind({ title: '金2 第14回 試験・まとめと解説' })).toBe('exam');
+    expect(practiceKind({ title: '【締切】富士フイルム（ES・テストセンター）' })).toBeNull();
+    expect(practiceKind({ title: 'tideライブ' })).toBeNull();
+    expect(practiceKind({ title: '熱海旅行' })).toBeNull();
+  });
+
+  it('練習: レッスンは開始時刻まで、試験・本番は前日までのタスクになる', () => {
+    const result = deadlineCandidates(
+      [ev('ピアノレッスン', '2026-10-23', '19:00', '19:30'), ev('宅建本番', '2026-10-18'), ev('【締切】SCSK（IT）', '2026-10-26')],
+      [],
+      '2026-10-16',
+    );
+    expect(result.map((c) => [c.kind, c.draft.title, c.draft.deadline, c.draft.deadline_time])).toEqual([
+      ['practice', '宅建の勉強(10/18まで)', '2026-10-17', null],
+      ['practice', 'ピアノの練習(10/23のレッスンまで)', '2026-10-23', '19:00'],
+      ['submit', 'SCSK（IT）', '2026-10-26', null],
+    ]);
+    expect(result[0].draft).toMatchObject({ priority: 'high', estimated_minutes: 300 });
+    expect(result.every((c) => c.defaultChecked)).toBe(true);
   });
 });

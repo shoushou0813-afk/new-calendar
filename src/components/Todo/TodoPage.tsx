@@ -232,7 +232,7 @@ export function TodoPage(props: TodoPageProps) {
               + タスクを追加
             </button>
             <button type="button" className="todo-secondary" onClick={() => setShowDeadlineImport(true)}>
-              締切をまとめて追加
+              提出・練習をまとめて追加
             </button>
           </div>
         </div>

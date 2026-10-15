@@ -54,7 +54,7 @@ export function DeadlineImportDialog({ events, tasks, today, onImport, onClose }
   return (
     <div className="todo-dialog-backdrop">
       <div className="todo-dialog">
-        <h3>締切をまとめてタスクにする</h3>
+        <h3>提出・練習をまとめてタスクにする</h3>
         {done !== null ? (
           <>
             <p className="todo-notice">{done}件のタスクを追加しました。「AIなしで自動割り当て」で今日やることを決められます。</p>
@@ -66,7 +66,7 @@ export function DeadlineImportDialog({ events, tasks, today, onImport, onClose }
           </>
         ) : candidates.length === 0 ? (
           <>
-            <p className="todo-hint">今日以降の【締切】の予定が見つかりませんでした。先に予定を取り込んでください。</p>
+            <p className="todo-hint">今日以降の【締切】やレッスン・試験の予定が見つかりませんでした。先に予定を取り込んでください。</p>
             <div className="todo-dialog-actions">
               <button type="button" className="todo-secondary" onClick={onClose}>
                 閉じる
@@ -76,7 +76,8 @@ export function DeadlineImportDialog({ events, tasks, today, onImport, onClose }
         ) : (
           <>
             <p className="todo-hint">
-              カレンダーの【締切】の予定から作ります。作業時間はタイトルから決めた目安なので、必要なら変えてください。
+              カレンダーの【締切】の予定(提出)と、レッスン・試験・本番の予定(練習・勉強)から作ります。
+              練習はレッスンの開始まで、勉強は前の日までに終わらせる計画になります。作業時間は目安なので、必要なら変えてください。
               予備締切と登録済みのものは最初はチェックを外しています。
             </p>
             <ul className="deadline-list">
@@ -86,6 +87,7 @@ export function DeadlineImportDialog({ events, tasks, today, onImport, onClose }
                     <input type="checkbox" checked={checked.has(i)} onChange={() => toggle(i)} />
                     <span className="deadline-body">
                       <span className="deadline-title">
+                        <span className={`deadline-kind is-${c.kind}`}>{c.kind === 'submit' ? '提出' : '練習'}</span>
                         {c.draft.title}
                         {c.alreadyAdded && <span className="deadline-tag">登録済み</span>}
                       </span>
