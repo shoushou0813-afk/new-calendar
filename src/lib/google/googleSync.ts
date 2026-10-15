@@ -1,0 +1,124 @@
+import { addDays, format } from 'date-fns';
+import type { EventRow } from '../../types/event';
+import { toHHmm, toMinutes } from '../planner/freeSlots';
+import type { GoogleEvent, GoogleEventInput } from './googleCalendarApi';
+
+/** Google 側の予定を、このアプリの予定の項目に変換する。時刻が読めなければ null。 */
+export function googleToFields(ge: GoogleEvent): Pick<EventRow, 'title' | 'date' | 'starts_at' | 'ends_at' | 'note'> | null {
+  const title = ge.summary?.trim() || '(無題の予定)';
+  const note = ge.description?.trim() || null;
+  if (ge.start?.dateTime) {
+    const start = new Date(ge.start.dateTime);
+    if (Number.isNaN(start.getTime())) return null;
+    const date = format(start, 'yyyy-MM-dd');
+    let endsAt: string | null = null;
+    if (ge.end?.dateTime) {
+      const end = new Date(ge.end.dateTime);
+      // 日をまたぐ予定は終了時刻を持たない(既存の .ics インポートと同じ扱い)
+      if (format(end, 'yyyy-MM-dd') === date) endsAt = format(end, 'HH:mm');
+    }
+    return { title, date, starts_at: format(start, 'HH:mm'), ends_at: endsAt, note };
+  }
+  if (ge.start?.date) {
+    return { title, date: ge.start.date, starts_at: '00:00', ends_at: null, note };
+  }
+  return null;
+}
+
+/** このアプリの予定を Google に送る形に変換する。 */
+export function localToGoogle(row: EventRow, timeZone: string): GoogleEventInput {
+  const startMin = toMinutes(row.starts_at);
+  let endMin = row.ends_at ? toMinutes(row.ends_at) : startMin + 60;
+  if (endMin <= startMin) endMin = startMin + 60;
+  const endDate = endMin >= 24 * 60 ? format(addDays(new Date(`${row.date}T00:00:00`), 1), 'yyyy-MM-dd') : row.date;
+  const description = [row.note, row.source_url].filter(Boolean).join('\n\n') || undefined;
+  return {
+    summary: row.title,
+    description,
+    start: { dateTime: `${row.date}T${row.starts_at}:00`, timeZone },
+    end: { dateTime: `${endDate}T${toHHmm(endMin % (24 * 60))}:00`, timeZone },
+  };
+}
+
+export interface SyncPlan {
+  /** Google にだけある予定 → ローカルに作る */
+  createLocal: GoogleEvent[];
+  /** Google 側で更新された予定 → ローカルを上書き */
+  updateLocal: { local: EventRow; remote: GoogleEvent }[];
+  /** Google 側で削除された予定 → ローカルからも消す */
+  deleteLocal: EventRow[];
+  /** ローカルにだけある予定 → Google に作る */
+  pushCreate: EventRow[];
+  /** ローカルで編集した予定 → Google を上書き */
+  pushUpdate: EventRow[];
+  /** ローカルで削除した同期済み予定 → Google からも消す */
+  pushDelete: string[];
+  /** すでに両方から消えているので記録を掃除してよいもの */
+  clearTombstones: string[];
+}
+
+function isLocallyModified(row: EventRow): boolean {
+  return !!row.google_synced_at && row.updated_at > row.google_synced_at;
+}
+
+function isRemotelyModified(row: EventRow, remote: GoogleEvent): boolean {
+  return !row.google_synced_at || (!!remote.updated && remote.updated > row.google_synced_at);
+}
+
+/**
+ * ローカルと Google の差分から、何をすべきかを決める(副作用なしの純粋関数)。
+ * 両方で編集されていたら、更新時刻が新しいほうを採用する。
+ */
+export function computeSyncPlan(params: {
+  local: EventRow[];
+  remote: GoogleEvent[];
+  tombstones: string[];
+  /** 同期する期間 yyyy-MM-dd(両端含む) */
+  from: string;
+  to: string;
+}): SyncPlan {
+  const plan: SyncPlan = { createLocal: [], updateLocal: [], deleteLocal: [], pushCreate: [], pushUpdate: [], pushDelete: [], clearTombstones: [] };
+  const byGoogleId = new Map(params.local.filter((e) => e.google_event_id).map((e) => [e.google_event_id!, e]));
+  const tombstones = new Set(params.tombstones);
+  const seenTombstones = new Set<string>();
+
+  for (const remote of params.remote) {
+    const local = byGoogleId.get(remote.id);
+    if (tombstones.has(remote.id)) {
+      seenTombstones.add(remote.id);
+      if (remote.status === 'cancelled') plan.clearTombstones.push(remote.id);
+      else plan.pushDelete.push(remote.id);
+      continue;
+    }
+    if (remote.status === 'cancelled') {
+      if (local) plan.deleteLocal.push(local);
+      continue;
+    }
+    if (!local) {
+      if (googleToFields(remote)) plan.createLocal.push(remote);
+      continue;
+    }
+    const localChanged = isLocallyModified(local);
+    const remoteChanged = isRemotelyModified(local, remote);
+    if (localChanged && (!remoteChanged || local.updated_at >= (remote.updated ?? ''))) plan.pushUpdate.push(local);
+    else if (remoteChanged) plan.updateLocal.push({ local, remote });
+  }
+
+  // 同期期間外などで今回見つからなかった削除記録も、Google に削除を送る(すでに無ければ成功扱い)
+  for (const id of tombstones) {
+    if (!seenTombstones.has(id)) plan.pushDelete.push(id);
+  }
+
+  for (const local of params.local) {
+    if (local.google_event_id) continue;
+    if (local.date < params.from || local.date > params.to) continue;
+    plan.pushCreate.push(local);
+  }
+  return plan;
+}
+
+export function syncWindow(now: Date): { from: Date; to: Date; fromDate: string; toDate: string } {
+  const from = addDays(new Date(now.getFullYear(), now.getMonth(), now.getDate()), -30);
+  const to = addDays(from, 30 + 180);
+  return { from, to, fromDate: format(from, 'yyyy-MM-dd'), toDate: format(addDays(to, -1), 'yyyy-MM-dd') };
+}

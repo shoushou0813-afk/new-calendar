@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { dbDeleteEvent, dbGetAllEvents, dbPutEvent } from '../lib/localDb';
+import { dbAddGoogleTombstone, dbDeleteEvent, dbGetAllEvents, dbPutEvent } from '../lib/localDb';
 import type { EventDraft, EventRow } from '../types/event';
 
 export function useEvents() {
@@ -43,6 +43,8 @@ export function useEvents() {
   };
 
   const deleteEvent = async (id: string) => {
+    const existing = events.find((e) => e.id === id);
+    if (existing?.google_event_id) await dbAddGoogleTombstone(existing.google_event_id);
     await dbDeleteEvent(id);
     await reload();
   };

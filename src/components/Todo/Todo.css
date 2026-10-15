@@ -1,0 +1,374 @@
+.todo-page {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 720px) {
+  .todo-page {
+    grid-template-columns: 3fr 2fr;
+    align-items: start;
+  }
+}
+
+.todo-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.todo-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.todo-panel-header h2 {
+  font-size: 16px;
+}
+
+.todo-panel button,
+.todo-dialog button {
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.todo-panel button:disabled,
+.todo-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.todo-panel button.todo-secondary,
+.todo-dialog button.todo-secondary {
+  background: var(--bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+}
+
+.todo-panel button.todo-danger {
+  background: none;
+  color: var(--danger);
+  border: 1px solid var(--border);
+}
+
+.todo-panel button.todo-link,
+.todo-dialog button.todo-link {
+  background: none;
+  color: var(--accent);
+  padding: 4px;
+  font-weight: 500;
+}
+
+.todo-free {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.todo-plan-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.todo-hint {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.todo-error {
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.todo-notice {
+  font-size: 13px;
+  color: var(--text-h);
+  background: var(--accent-bg);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.todo-summary {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.todo-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-right: 6px;
+}
+
+.todo-warnings {
+  margin: 0;
+  padding: 8px 12px 8px 28px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.todo-progress {
+  position: relative;
+  height: 22px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.todo-progress-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-bg);
+  transition: width 0.2s;
+}
+
+.todo-progress span {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-h);
+}
+
+.todo-items,
+.todo-tasks,
+.todo-done-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todo-items li label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.todo-items li input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.todo-items li.is-done .todo-item-title {
+  text-decoration: line-through;
+  color: var(--text);
+}
+
+.todo-item-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.todo-item-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.todo-item-title {
+  color: var(--text-h);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.todo-item-reason {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.todo-tasks li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.todo-tasks li.is-risk {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+}
+
+.todo-task-main {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.todo-task-top {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.todo-task-title {
+  font-weight: 600;
+  color: var(--text-h);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.todo-task-meta {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.todo-task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.todo-priority {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+}
+
+.todo-priority.is-high {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.todo-done-list {
+  font-size: 13px;
+}
+
+.todo-done-list ul {
+  margin-top: 8px;
+}
+
+.todo-done-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text);
+  text-decoration: line-through;
+}
+
+.todo-done-list li button {
+  text-decoration: none;
+}
+
+.todo-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  z-index: 60;
+}
+
+.todo-dialog {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-panel);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-dialog h3 {
+  font-size: 18px;
+}
+
+.todo-dialog fieldset {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.todo-dialog legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  padding: 0 4px;
+}
+
+.todo-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-dialog input,
+.todo-dialog select,
+.todo-dialog textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  width: 100%;
+}
+
+.todo-dialog-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.todo-dialog-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.todo-dialog-inline input {
+  width: 64px;
+}
+
+.todo-dialog-actions {
+  display: flex;
+  gap: 8px;
+}

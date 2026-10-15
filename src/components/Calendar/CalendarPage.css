@@ -29,6 +29,20 @@
 .calendar-page-tabs {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.calendar-page-sync {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.calendar-page-sync.is-error {
+  background: var(--warn-bg);
+  color: var(--warn);
 }
 
 .calendar-page-tabs button {

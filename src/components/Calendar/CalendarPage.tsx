@@ -9,14 +9,25 @@ import { MonthView } from './MonthView';
 import { EventCard } from '../EventList/EventCard';
 import { EventForm } from '../EventForm/EventForm';
 import { ImportDialog } from '../Import/ImportDialog';
+import { SettingsDialog } from '../Settings/SettingsDialog';
+import { TodoPage } from '../Todo/TodoPage';
+import { useSettings } from '../../hooks/useSettings';
+import { useTasks } from '../../hooks/useTasks';
+import { resolveGoogleClientId } from '../../lib/settings';
+import { runGoogleSync } from '../../lib/google/runGoogleSync';
 import type { EventDraft, EventRow } from '../../types/event';
 import './CalendarPage.css';
 
-type Tab = 'calendar' | 'noEvidence';
+type Tab = 'calendar' | 'todo' | 'noEvidence';
 
 export function CalendarPage() {
-  const { events, loading, createEvent, updateEvent, deleteEvent, importEvents } = useEvents();
+  const { events, loading, reload, createEvent, updateEvent, deleteEvent, importEvents } = useEvents();
   const { categories, addCategory } = useCategories();
+  const { tasks, createTask, updateTask, deleteTask } = useTasks();
+  const { settings, updateSettings } = useSettings();
+  const [showSettings, setShowSettings] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -30,7 +41,7 @@ export function CalendarPage() {
   );
 
   const noEvidenceEvents = useMemo(
-    () => events.filter((e) => hasNoEvidence(toEventInput(e))).sort((a, b) => a.date.localeCompare(b.date)),
+    () => events.filter((e) => !e.task_id && hasNoEvidence(toEventInput(e))).sort((a, b) => a.date.localeCompare(b.date)),
     [events],
   );
 
@@ -41,6 +52,35 @@ export function CalendarPage() {
       await createEvent(draft);
     }
     setEditingEvent(null);
+  };
+
+  const handleSync = async () => {
+    const clientId = resolveGoogleClientId(settings);
+    if (!clientId) {
+      setSyncMessage({ kind: 'error', text: '設定で Google の OAuth クライアントIDを入力してください(README参照)。' });
+      setShowSettings(true);
+      return;
+    }
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const r = await runGoogleSync(clientId, settings);
+      await reload();
+      setSyncMessage({
+        kind: 'ok',
+        text: `同期しました: Googleから 追加${r.pulledNew}・更新${r.pulledUpdated}・削除${r.pulledDeleted} / Googleへ 追加${r.pushedNew}・更新${r.pushedUpdated}・削除${r.pushedDeleted}`,
+      });
+    } catch (err) {
+      setSyncMessage({ kind: 'error', text: err instanceof Error ? err.message : '同期に失敗しました' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  /** その日のAI作業ブロックを入れ替える(前回の計画で入れたブロックは消す) */
+  const replacePlanEvents = async (date: string, drafts: EventDraft[]) => {
+    for (const old of events.filter((e) => e.date === date && e.task_id)) await deleteEvent(old.id);
+    await importEvents(drafts);
   };
 
   const handleDelete = async (event: EventRow) => {
@@ -59,13 +99,24 @@ export function CalendarPage() {
         <button type="button" className={tab === 'calendar' ? 'is-active' : ''} onClick={() => setTab('calendar')}>
           カレンダー
         </button>
+        <button type="button" className={tab === 'todo' ? 'is-active' : ''} onClick={() => setTab('todo')}>
+          今日のTodo
+        </button>
         <button type="button" className={tab === 'noEvidence' ? 'is-active' : ''} onClick={() => setTab('noEvidence')}>
           裏付けのない予定 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
         </button>
-        <button type="button" className="calendar-page-import-button" onClick={() => setShowImport(true)}>
+        <button type="button" className="calendar-page-import-button" onClick={() => void handleSync()} disabled={syncing}>
+          {syncing ? '同期中...' : 'Google同期'}
+        </button>
+        <button type="button" onClick={() => setShowImport(true)}>
           インポート
         </button>
+        <button type="button" onClick={() => setShowSettings(true)}>
+          設定
+        </button>
       </nav>
+
+      {syncMessage && <p className={`calendar-page-sync is-${syncMessage.kind}`}>{syncMessage.text}</p>}
 
       {tab === 'calendar' ? (
         <div className="calendar-page-body">
@@ -90,6 +141,18 @@ export function CalendarPage() {
             )}
           </div>
         </div>
+      ) : tab === 'todo' ? (
+        <TodoPage
+          date={selectedDate}
+          events={events}
+          tasks={tasks}
+          settings={settings}
+          onCreateTask={createTask}
+          onUpdateTask={updateTask}
+          onDeleteTask={deleteTask}
+          onReplacePlanEvents={replacePlanEvents}
+          onOpenSettings={() => setShowSettings(true)}
+        />
       ) : (
         <div className="calendar-page-list">
           <p className="calendar-page-hint">
@@ -114,6 +177,19 @@ export function CalendarPage() {
           onAddCategory={addCategory}
           onSave={handleSave}
           onCancel={() => setEditingEvent(null)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsDialog
+          settings={settings}
+          categories={categories}
+          envClientId={resolveGoogleClientId({ ...settings, googleClientId: '' })}
+          onSave={(next) => {
+            updateSettings(next);
+            setShowSettings(false);
+          }}
+          onClose={() => setShowSettings(false)}
         />
       )}
 

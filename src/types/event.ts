@@ -20,13 +20,19 @@ export interface EventRow {
   memory_checked_at: string | null;
   /** Reserved for the future memory-test feature (spec 1/8) — unused for now. */
   miss_count: number;
+  /** Googleカレンダー側のイベントID。同期済みの予定にだけ入る。 */
+  google_event_id?: string | null;
+  /** 最後にGoogleカレンダーと同期した時刻(ISO)。これより updated_at が新しければローカルで編集済み。 */
+  google_synced_at?: string | null;
+  /** AIプランナーが作った作業ブロックの場合、元のタスクID。 */
+  task_id?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export type EventDraft = Omit<
   EventRow,
-  'id' | 'warnings' | 'memory_checked_at' | 'miss_count' | 'created_at' | 'updated_at'
+  'id' | 'warnings' | 'memory_checked_at' | 'miss_count' | 'created_at' | 'updated_at' | 'google_event_id' | 'google_synced_at'
 > & {
   warnings?: WarningLogEntry[];
 };
