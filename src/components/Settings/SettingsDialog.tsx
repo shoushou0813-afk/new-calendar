@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AppSettings } from '../../lib/settings';
+import { NotificationSettings } from './NotificationSettings';
 import '../Todo/Todo.css';
 
 interface SettingsDialogProps {
@@ -42,6 +43,8 @@ export function SettingsDialog({ settings, categories, envClientId, onSave, onCl
             この端末にあるデータは、初回にネットへ送られます。空にすると、この端末だけの保存に戻ります。
           </p>
         </fieldset>
+
+        <NotificationSettings token={settings.cloudToken} />
 
         <fieldset>
           <legend>Googleカレンダー同期</legend>

@@ -8,3 +8,8 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// 通知を受け取るためのサービスワーカーを登録する(対応していないブラウザでは何もしない)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  void navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+}

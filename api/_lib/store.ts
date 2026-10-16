@@ -74,3 +74,36 @@ export async function updateDoc<T>(makeOps: (doc: CloudDoc) => { ops: CloudOp[];
   }
   throw new Error('conflict, please retry');
 }
+
+// ---- 通知の宛先(スマホごとのプッシュ通知の受け口)。予定のデータとは別のファイルに置く ----
+
+const PUSH_PATH = 'calendar/push.json';
+
+export interface PushSubscriptionRecord {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  created_at: string;
+}
+
+export async function readSubscriptions(): Promise<PushSubscriptionRecord[]> {
+  try {
+    await head(PUSH_PATH);
+  } catch (err) {
+    if (err instanceof BlobNotFoundError) return [];
+    throw err;
+  }
+  const result = await get(PUSH_PATH, { access: 'private', useCache: false });
+  if (!result || result.statusCode !== 200) return [];
+  const parsed = JSON.parse(await new Response(result.stream).text()) as { subscriptions?: PushSubscriptionRecord[] };
+  return parsed.subscriptions ?? [];
+}
+
+export async function writeSubscriptions(subscriptions: PushSubscriptionRecord[]): Promise<void> {
+  await put(PUSH_PATH, JSON.stringify({ subscriptions }), {
+    access: 'private',
+    contentType: 'application/json',
+    allowOverwrite: true,
+    addRandomSuffix: false,
+    cacheControlMaxAge: 60,
+  });
+}
