@@ -9,6 +9,8 @@ export interface EventRow {
   doors_at: string | null;
   starts_at: string;
   ends_at: string | null;
+  /** 終わる日 yyyy-MM-dd(日をまたぐ予定だけ。null/省略なら date と同じ日に終わる) */
+  end_date?: string | null;
   source_url: string | null;
   /** Ticket image, stored as a Blob directly in IndexedDB (no external storage). */
   image: Blob | null;

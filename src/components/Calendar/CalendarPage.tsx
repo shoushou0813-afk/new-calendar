@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { format, isSameDay, parseISO, startOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useCategories } from '../../hooks/useCategories';
 import { useEvents } from '../../hooks/useEvents';
@@ -17,6 +17,7 @@ import { resolveGoogleClientId } from '../../lib/settings';
 import { runGoogleSync } from '../../lib/google/runGoogleSync';
 import { clearImportLink, readImportLink } from '../../lib/importLink';
 import { configureCloud, syncNow } from '../../lib/cloud/cloudSync';
+import { eventOccursOn, eventSliceOn } from '../../lib/eventSpan';
 import { useCloudStatus } from '../../hooks/useCloudStatus';
 import type { EventDraft, EventRow } from '../../types/event';
 import './CalendarPage.css';
@@ -70,7 +71,12 @@ export function CalendarPage() {
   }, []);
 
   const dayEvents = useMemo(
-    () => events.filter((e) => isSameDay(parseISO(e.date), selectedDate)).sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
+    () => {
+      const day = format(selectedDate, 'yyyy-MM-dd');
+      return events
+        .filter((e) => eventOccursOn(e, day))
+        .sort((a, b) => eventSliceOn(a, day).starts_at.localeCompare(eventSliceOn(b, day).starts_at));
+    },
     [events, selectedDate],
   );
 

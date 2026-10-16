@@ -72,12 +72,13 @@ function buildServer(): McpServer {
     'add_event',
     {
       title: '予定を追加',
-      description: '予定を1件追加する。start を省略するか all_day: true で終日の予定になる。日をまたぐ予定は end を省略する。',
+      description: '予定を1件追加する。start を省略するか all_day: true で終日の予定になる。日をまたぐ予定は end_date に終わる日を入れる。',
       inputSchema: {
         title: z.string(),
         date,
         start: time.optional(),
         end: time.optional(),
+        end_date: date.optional().describe('日をまたぐ予定の終わる日(例: 17:00〜翌0:04 なら翌日の日付と end: 00:04)'),
         all_day: z.boolean().optional(),
         category: z.string().optional().describe('カテゴリ(例: 仕事 / 学校 / ライブ / その他)。省略時は「その他」'),
         note: z.string().optional(),
@@ -97,6 +98,7 @@ function buildServer(): McpServer {
         date: date.optional(),
         start: time.optional(),
         end: time.nullable().optional().describe('終了時刻。null で「終了時刻なし」'),
+        end_date: date.nullable().optional().describe('終わる日。null で開始と同じ日に終わる'),
         category: z.string().optional(),
         note: z.string().nullable().optional(),
       },

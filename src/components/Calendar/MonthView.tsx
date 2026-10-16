@@ -15,6 +15,7 @@ import { ja } from 'date-fns/locale';
 import { useRef, useState, type TouchEvent } from 'react';
 import type { EventRow } from '../../types/event';
 import { isDeadlineEvent } from '../../lib/deadlineTasks';
+import { eventDays } from '../../lib/eventSpan';
 import './MonthView.css';
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -60,9 +61,12 @@ export function MonthView({ month, events, selectedDate, onSelectDate, onChangeM
 
   const eventsByDate = new Map<string, EventRow[]>();
   for (const event of events) {
-    const list = eventsByDate.get(event.date) ?? [];
-    list.push(event);
-    eventsByDate.set(event.date, list);
+    // 日をまたぐ予定は、かかっている日すべてに出す
+    for (const day of eventDays(event)) {
+      const list = eventsByDate.get(day) ?? [];
+      list.push(event);
+      eventsByDate.set(day, list);
+    }
   }
 
   const touchStart = useRef<{ x: number; y: number } | null>(null);

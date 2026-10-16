@@ -36,6 +36,27 @@ describe('googleToFields / localToGoogle', () => {
     });
   });
 
+  it('日をまたぐ予定と、複数日の終日予定', () => {
+    expect(
+      googleToFields({ id: 'x', start: { dateTime: '2026-11-08T17:00:00+09:00' }, end: { dateTime: '2026-11-09T00:04:00+09:00' } }),
+    ).toMatchObject({ date: '2026-11-08', starts_at: '17:00', ends_at: '00:04', end_date: '2026-11-09' });
+    expect(
+      googleToFields({ id: 'x', start: { dateTime: '2026-11-08T17:00:00+09:00' }, end: { dateTime: '2026-11-09T00:00:00+09:00' } }),
+    ).toMatchObject({ ends_at: '23:59', end_date: null });
+    expect(googleToFields({ id: 'x', start: { date: '2026-10-24' }, end: { date: '2026-10-26' } })).toMatchObject({
+      date: '2026-10-24',
+      end_date: '2026-10-25',
+    });
+    expect(localToGoogle(row({ date: '2026-11-08', starts_at: '17:00', ends_at: '00:04', end_date: '2026-11-09' }), 'Asia/Tokyo')).toMatchObject({
+      start: { dateTime: '2026-11-08T17:00:00' },
+      end: { dateTime: '2026-11-09T00:04:00' },
+    });
+    expect(localToGoogle(row({ date: '2026-10-24', starts_at: '00:00', ends_at: null, end_date: '2026-10-25' }), 'Asia/Tokyo')).toMatchObject({
+      start: { date: '2026-10-24' },
+      end: { date: '2026-10-26' },
+    });
+  });
+
   it('終了時刻なしのローカル予定は1時間の予定として送る', () => {
     const g = localToGoogle(row({ starts_at: '23:30', ends_at: null }), 'Asia/Tokyo');
     expect(g.start).toEqual({ dateTime: '2026-10-20T23:30:00', timeZone: 'Asia/Tokyo' });

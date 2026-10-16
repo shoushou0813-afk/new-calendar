@@ -1,10 +1,11 @@
-import { addDays, format } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
+import { eventEndDate, isMultiDay } from '../eventSpan';
 import type { EventRow } from '../../types/event';
 import { toHHmm, toMinutes } from '../planner/freeSlots';
 import type { GoogleEvent, GoogleEventInput } from './googleCalendarApi';
 
 /** Google 側の予定を、このアプリの予定の項目に変換する。時刻が読めなければ null。 */
-export function googleToFields(ge: GoogleEvent): Pick<EventRow, 'title' | 'date' | 'starts_at' | 'ends_at' | 'note'> | null {
+export function googleToFields(ge: GoogleEvent): Pick<EventRow, 'title' | 'date' | 'starts_at' | 'ends_at' | 'end_date' | 'note'> | null {
   const title = ge.summary?.trim() || '(無題の予定)';
   const note = ge.description?.trim() || null;
   if (ge.start?.dateTime) {
@@ -12,26 +13,54 @@ export function googleToFields(ge: GoogleEvent): Pick<EventRow, 'title' | 'date'
     if (Number.isNaN(start.getTime())) return null;
     const date = format(start, 'yyyy-MM-dd');
     let endsAt: string | null = null;
+    let endDate: string | null = null;
     if (ge.end?.dateTime) {
       const end = new Date(ge.end.dateTime);
-      // 日をまたぐ予定は終了時刻を持たない(既存の .ics インポートと同じ扱い)
-      if (format(end, 'yyyy-MM-dd') === date) endsAt = format(end, 'HH:mm');
+      const endDay = format(end, 'yyyy-MM-dd');
+      const nextDay = format(addDays(parseISO(date), 1), 'yyyy-MM-dd');
+      if (endDay === date) endsAt = format(end, 'HH:mm');
+      // ちょうど翌日 0:00 に終わる予定は、その日の終わり(23:59)までの予定として持つ
+      else if (endDay === nextDay && format(end, 'HH:mm') === '00:00') endsAt = '23:59';
+      else if (endDay > date) {
+        endDate = endDay;
+        endsAt = format(end, 'HH:mm');
+      }
     }
-    return { title, date, starts_at: format(start, 'HH:mm'), ends_at: endsAt, note };
+    return { title, date, starts_at: format(start, 'HH:mm'), ends_at: endsAt, end_date: endDate, note };
   }
   if (ge.start?.date) {
-    return { title, date: ge.start.date, starts_at: '00:00', ends_at: null, note };
+    // 終日の予定の end.date は「終わった次の日」なので1日戻す
+    const lastDay = ge.end?.date ? format(addDays(parseISO(ge.end.date), -1), 'yyyy-MM-dd') : ge.start.date;
+    return { title, date: ge.start.date, starts_at: '00:00', ends_at: null, end_date: lastDay > ge.start.date ? lastDay : null, note };
   }
   return null;
 }
 
 /** このアプリの予定を Google に送る形に変換する。 */
 export function localToGoogle(row: EventRow, timeZone: string): GoogleEventInput {
+  const description = [row.note, row.source_url].filter(Boolean).join('\n\n') || undefined;
+  const lastDay = eventEndDate(row);
+  // 終日の予定(0:00開始・終了時刻なし)は、Googleでも終日の予定にする
+  if (row.starts_at === '00:00' && !row.ends_at) {
+    return {
+      summary: row.title,
+      description,
+      start: { date: row.date },
+      end: { date: format(addDays(parseISO(lastDay), 1), 'yyyy-MM-dd') },
+    };
+  }
+  if (isMultiDay(row)) {
+    return {
+      summary: row.title,
+      description,
+      start: { dateTime: `${row.date}T${row.starts_at}:00`, timeZone },
+      end: { dateTime: `${lastDay}T${row.ends_at ?? '23:59'}:00`, timeZone },
+    };
+  }
   const startMin = toMinutes(row.starts_at);
   let endMin = row.ends_at ? toMinutes(row.ends_at) : startMin + 60;
   if (endMin <= startMin) endMin = startMin + 60;
-  const endDate = endMin >= 24 * 60 ? format(addDays(new Date(`${row.date}T00:00:00`), 1), 'yyyy-MM-dd') : row.date;
-  const description = [row.note, row.source_url].filter(Boolean).join('\n\n') || undefined;
+  const endDate = endMin >= 24 * 60 ? format(addDays(parseISO(row.date), 1), 'yyyy-MM-dd') : row.date;
   return {
     summary: row.title,
     description,

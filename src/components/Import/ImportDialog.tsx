@@ -169,6 +169,7 @@ export function ImportDialog({
           doors_at: null,
           starts_at: e.startsAt,
           ends_at: e.endsAt,
+          end_date: e.endDate,
           source_url: e.sourceUrl,
           image: null,
           note: e.note,

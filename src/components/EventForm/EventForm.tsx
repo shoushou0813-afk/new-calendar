@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { format } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import { validateEvent, type EventInput, type Warning, type WarningLogEntry } from '../../lib/validation';
 import { appendWarningLog } from '../../lib/warningsLog';
 import { toEventInput } from '../../lib/eventMapper';
@@ -24,6 +24,8 @@ interface FormState {
   doorsAt: string;
   startsAt: string;
   endsAt: string;
+  /** 終わる日(空なら開始と同じ日。終了時刻が開始より前なら翌日として保存) */
+  endDate: string;
   sourceUrl: string;
   note: string;
   hasAlarm: boolean;
@@ -40,6 +42,7 @@ function toFormState(event: EventRow | undefined, defaultDate: Date, defaultCate
       doorsAt: event.doors_at ?? '',
       startsAt: event.starts_at,
       endsAt: event.ends_at ?? '',
+      endDate: event.end_date && event.end_date > event.date ? event.end_date : '',
       sourceUrl: event.source_url ?? '',
       note: event.note ?? '',
       hasAlarm: event.has_alarm,
@@ -54,12 +57,23 @@ function toFormState(event: EventRow | undefined, defaultDate: Date, defaultCate
     doorsAt: '',
     startsAt: '10:00',
     endsAt: '',
+    endDate: '',
     sourceUrl: '',
     note: '',
     hasAlarm: false,
     timeConfirmed: false,
     image: null,
   };
+}
+
+/**
+ * 保存する「終わる日」。終了日を選んでいればその日、選んでいなくても終了時刻が開始時刻より前
+ * (例: 17:00〜0:04)なら翌日に終わる予定とみなす。同じ日に終わるなら null。
+ */
+function resolvedEndDate(form: FormState): string | null {
+  if (form.endDate && form.endDate > form.date) return form.endDate;
+  if (form.endsAt && form.startsAt && form.endsAt < form.startsAt) return format(addDays(parseISO(form.date), 1), 'yyyy-MM-dd');
+  return null;
 }
 
 function toEventInputFromForm(form: FormState): EventInput {
@@ -100,12 +114,21 @@ export function EventForm({ categories, defaultDate, initialEvent, history, onAd
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // フォームを開いている間は、後ろのカレンダーがスクロールしないようにする
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   const otherHistory: EventInput[] = history.filter((e) => e.id !== initialEvent?.id).map(toEventInput);
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === 'doorsAt' || key === 'startsAt' || key === 'endsAt') {
+      if (key === 'doorsAt' || key === 'startsAt' || key === 'endsAt' || key === 'endDate') {
         next.timeConfirmed = false;
       }
       return next;
@@ -123,6 +146,7 @@ export function EventForm({ categories, defaultDate, initialEvent, history, onAd
         doors_at: finalForm.doorsAt || null,
         starts_at: finalForm.startsAt,
         ends_at: finalForm.endsAt || null,
+        end_date: resolvedEndDate(finalForm),
         source_url: finalForm.sourceUrl || null,
         image: finalForm.image,
         note: finalForm.note || null,
@@ -190,7 +214,12 @@ export function EventForm({ categories, defaultDate, initialEvent, history, onAd
   return (
     <div className="event-form-backdrop">
       <form className="event-form" onSubmit={handleSubmit}>
-        <h3>{initialEvent ? '予定を編集' : '予定を追加'}</h3>
+        <div className="event-form-header">
+          <h3>{initialEvent ? '予定を編集' : '予定を追加'}</h3>
+          <button type="button" className="event-form-close" onClick={onCancel} aria-label="閉じる">
+            ×
+          </button>
+        </div>
 
         <label>
           予定名
@@ -225,18 +254,38 @@ export function EventForm({ categories, defaultDate, initialEvent, history, onAd
 
         <div className="event-form-time-row">
           <label>
-            集合・受付
+            <span>集合・受付</span>
             <input type="time" value={form.doorsAt} onChange={(e) => updateField('doorsAt', e.target.value)} />
           </label>
           <label>
-            開始 <span className="required">*</span>
+            <span>
+              開始 <span className="required">*</span>
+            </span>
             <input type="time" value={form.startsAt} onChange={(e) => updateField('startsAt', e.target.value)} required />
           </label>
           <label>
-            終了
+            <span>終了</span>
             <input type="time" value={form.endsAt} onChange={(e) => updateField('endsAt', e.target.value)} />
           </label>
         </div>
+
+        <label>
+          終了日(日をまたぐ予定のとき)
+          <input
+            type="date"
+            value={form.endDate}
+            min={form.date}
+            onChange={(e) => updateField('endDate', e.target.value)}
+          />
+        </label>
+        {(() => {
+          const end = resolvedEndDate(form);
+          return end ? (
+            <p className="event-form-hint">
+              {format(parseISO(form.date), 'M/d')} {form.startsAt} 〜 {format(parseISO(end), 'M/d')} {form.endsAt || '(終了時刻なし)'} の予定として保存します
+            </p>
+          ) : null;
+        })()}
 
         <label>
           関連URL(案内・申込ページ・チケットなど)
@@ -245,9 +294,21 @@ export function EventForm({ categories, defaultDate, initialEvent, history, onAd
 
         <label>
           画像(案内・確認メール・チケットのスクショなど)
-          <input type="file" accept="image/*" onChange={(e) => updateField('image', e.target.files?.[0] ?? null)} />
+          <input
+            key={form.image ? 'has-image' : 'no-image'}
+            type="file"
+            accept="image/*"
+            onChange={(e) => updateField('image', e.target.files?.[0] ?? null)}
+          />
         </label>
-        {form.image && <ImagePreview image={form.image} />}
+        {form.image && (
+          <div className="event-form-image">
+            <ImagePreview image={form.image} />
+            <button type="button" className="event-form-image-remove" onClick={() => updateField('image', null)}>
+              画像を外す
+            </button>
+          </div>
+        )}
 
         <label>
           メモ

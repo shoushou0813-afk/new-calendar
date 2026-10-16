@@ -8,8 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "TZ=Asia/Tokyo vitest run",
+    "test:watch": "TZ=Asia/Tokyo vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.134.0",

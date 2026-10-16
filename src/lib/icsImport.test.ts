@@ -23,6 +23,7 @@ describe('parseIcs', () => {
         date: '2026-09-01',
         startsAt: '19:00',
         endsAt: '21:00',
+        endDate: null,
         sourceUrl: 'https://example.com/ticket',
         note: '会場は渋谷です',
       },
@@ -46,14 +47,20 @@ describe('parseIcs', () => {
     const ics = ['BEGIN:VEVENT', 'SUMMARY:旅行', 'DTSTART;VALUE=DATE:20261201', 'DTEND;VALUE=DATE:20261203', 'END:VEVENT'].join('\n');
 
     const events = parseIcs(ics);
-    expect(events).toEqual([{ title: '旅行', date: '2026-12-01', startsAt: '00:00', endsAt: null, sourceUrl: null, note: null }]);
+    expect(events).toEqual([{ title: '旅行', date: '2026-12-01', startsAt: '00:00', endsAt: null, endDate: '2026-12-02', sourceUrl: null, note: null }]);
   });
 
-  it('drops the end time when DTEND falls on a different day than DTSTART', () => {
+  it('keeps the end time and end date when DTEND falls on a later day than DTSTART', () => {
     const ics = ['BEGIN:VEVENT', 'SUMMARY:夜通しイベント', 'DTSTART:20260901T230000', 'DTEND:20260902T020000', 'END:VEVENT'].join('\n');
 
     const events = parseIcs(ics);
-    expect(events[0].endsAt).toBeNull();
+    expect(events[0]).toMatchObject({ date: '2026-09-01', startsAt: '23:00', endsAt: '02:00', endDate: '2026-09-02' });
+  });
+
+  it('turns a multi-day all-day event into an end date (DTEND is exclusive)', () => {
+    const ics = ['BEGIN:VEVENT', 'SUMMARY:旅行', 'DTSTART;VALUE=DATE:20261024', 'DTEND;VALUE=DATE:20261026', 'END:VEVENT'].join('\n');
+
+    expect(parseIcs(ics)[0]).toMatchObject({ date: '2026-10-24', startsAt: '00:00', endsAt: null, endDate: '2026-10-25' });
   });
 
   it('unescapes commas, semicolons, backslashes, and newlines in text fields', () => {

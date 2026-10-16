@@ -38,6 +38,7 @@ function eventSummary(e: CloudEvent): Rec {
     date: e.date,
     start: allDay ? '終日' : e.starts_at,
     end: e.ends_at ?? null,
+    end_date: e.end_date ?? null,
     category: e.category,
     note: e.note ?? null,
     has_image: Boolean(e.image),
@@ -66,8 +67,9 @@ export function listEvents(doc: CloudDoc, args: { from?: string; to?: string; qu
   const to = args.to ?? addDays(from, 13);
   if (!DATE_RE.test(from) || !DATE_RE.test(to)) return fail('from / to は yyyy-MM-dd で指定してください。');
   const q = args.query?.trim();
+  // 日をまたぐ予定は、期間に少しでもかかっていれば出す
   const events = Object.values(doc.events)
-    .filter((e) => String(e.date) >= from && String(e.date) <= to)
+    .filter((e) => String(e.date) <= to && String(e.end_date && String(e.end_date) > String(e.date) ? e.end_date : e.date) >= from)
     .filter((e) => !q || `${e.title} ${e.note ?? ''}`.includes(q))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.starts_at).localeCompare(String(b.starts_at)))
     .map(eventSummary);
@@ -79,6 +81,8 @@ export interface AddEventArgs {
   date: string;
   start?: string;
   end?: string;
+  /** 日をまたぐ予定の終わる日 yyyy-MM-dd */
+  end_date?: string;
   all_day?: boolean;
   category?: string;
   note?: string;
@@ -90,7 +94,9 @@ export function addEvent(_doc: CloudDoc, args: AddEventArgs, now = new Date(), i
   const allDay = args.all_day || !args.start;
   if (!allDay && !TIME_RE.test(args.start!)) return fail('start は HH:mm(24時間)で指定してください。');
   if (args.end && !TIME_RE.test(args.end)) return fail('end は HH:mm(24時間)で指定してください。');
-  if (!allDay && args.end && args.end <= args.start!) return fail('end は start より後にしてください(日をまたぐ予定は end を省略)。');
+  if (args.end_date !== undefined && (!DATE_RE.test(args.end_date) || args.end_date < args.date)) return fail('end_date は date 以降の yyyy-MM-dd で指定してください。');
+  const multiDay = Boolean(args.end_date && args.end_date > args.date);
+  if (!allDay && !multiDay && args.end && args.end <= args.start!) return fail('end は start より後にしてください(日をまたぐ予定は end_date で終わる日を指定)。');
   const ts = now.toISOString();
   const record: CloudEvent = {
     id,
@@ -100,6 +106,7 @@ export function addEvent(_doc: CloudDoc, args: AddEventArgs, now = new Date(), i
     doors_at: null,
     starts_at: allDay ? '00:00' : args.start!,
     ends_at: allDay ? null : (args.end ?? null),
+    end_date: multiDay ? args.end_date! : null,
     source_url: null,
     image: null,
     note: args.note?.trim() || null,
@@ -122,6 +129,7 @@ export interface UpdateEventArgs {
   date?: string;
   start?: string;
   end?: string | null;
+  end_date?: string | null;
   category?: string;
   note?: string | null;
 }
@@ -138,11 +146,15 @@ export function updateEvent(doc: CloudDoc, args: UpdateEventArgs, now = new Date
     ...(args.date !== undefined ? { date: args.date } : {}),
     ...(args.start !== undefined ? { starts_at: args.start } : {}),
     ...(args.end !== undefined ? { ends_at: args.end } : {}),
+    ...(args.end_date !== undefined ? { end_date: args.end_date } : {}),
     ...(args.category !== undefined ? { category: args.category } : {}),
     ...(args.note !== undefined ? { note: args.note } : {}),
     updated_at: now.toISOString(),
   };
-  if (next.ends_at && String(next.ends_at) <= String(next.starts_at)) return fail('end は start より後にしてください。');
+  const nextMulti = Boolean(next.end_date && String(next.end_date) > String(next.date));
+  if (next.end_date && String(next.end_date) < String(next.date)) return fail('end_date は date 以降にしてください。');
+  if (!nextMulti && next.ends_at && String(next.ends_at) <= String(next.starts_at))
+    return fail('end は start より後にしてください(日をまたぐなら end_date を指定)。');
   return { ops: [{ op: 'put', collection: 'events', record: next }], result: { ok: true, updated: eventSummary(next) } };
 }
 

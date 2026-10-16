@@ -4,8 +4,10 @@ export interface ParsedIcsEvent {
   date: string;
   /** HH:mm */
   startsAt: string;
-  /** HH:mm, only set when the event ends the same day it starts */
+  /** HH:mm */
   endsAt: string | null;
+  /** yyyy-MM-dd、日をまたぐ予定のときだけ(終わる日) */
+  endDate: string | null;
   sourceUrl: string | null;
   note: string | null;
 }
@@ -76,6 +78,12 @@ function parseDateTime(line: IcsLine): { date: string; time: string | null } {
   return { date: `${y}-${mo}-${d}`, time: `${h}:${mi}` };
 }
 
+function shiftDate(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 function buildEvent(fields: Record<string, IcsLine>): ParsedIcsEvent | null {
   const dtstart = fields.DTSTART;
   if (!dtstart) return null;
@@ -83,9 +91,23 @@ function buildEvent(fields: Record<string, IcsLine>): ParsedIcsEvent | null {
   if (!start.date) return null;
 
   let endsAt: string | null = null;
+  let endDate: string | null = null;
   if (fields.DTEND) {
     const end = parseDateTime(fields.DTEND);
-    if (end.date === start.date && end.time) endsAt = end.time;
+    if (end.time === null && start.time === null) {
+      // 終日の予定の DTEND は「終わった次の日」なので1日戻す
+      const last = shiftDate(end.date, -1);
+      if (last > start.date) endDate = last;
+    } else if (end.date === start.date && end.time) {
+      endsAt = end.time;
+    } else if (end.time && end.date > start.date) {
+      // ちょうど翌日 0:00 に終わる予定は、その日の 23:59 まで
+      if (end.time === '00:00' && end.date === shiftDate(start.date, 1)) endsAt = '23:59';
+      else {
+        endsAt = end.time;
+        endDate = end.date;
+      }
+    }
   }
 
   return {
@@ -93,6 +115,7 @@ function buildEvent(fields: Record<string, IcsLine>): ParsedIcsEvent | null {
     date: start.date,
     startsAt: start.time ?? '00:00',
     endsAt,
+    endDate,
     sourceUrl: fields.URL ? fields.URL.value : null,
     note: fields.DESCRIPTION ? unescapeText(fields.DESCRIPTION.value) : null,
   };

@@ -130,3 +130,83 @@
   border-radius: 8px;
   padding: 10px 16px;
 }
+
+.event-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.event-form-close {
+  border: none;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text);
+  padding: 4px 8px;
+}
+
+.event-form-time-row label {
+  min-width: 0;
+}
+
+.event-form-time-row input {
+  width: 100%;
+  min-width: 0;
+}
+
+.event-form-hint {
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: -6px;
+}
+
+.event-form-image {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-form-image-remove {
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* スマホでは全画面で開き、上の見出しと下の保存ボタンを固定する(後ろのカレンダーが透けて見切れないように) */
+@media (max-width: 600px) {
+  .event-form-backdrop {
+    padding: 0;
+    background: var(--bg-panel);
+  }
+
+  .event-form {
+    max-width: none;
+    min-height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0 16px 16px;
+  }
+
+  .event-form-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-panel);
+    padding: 14px 0 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .event-form-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-panel);
+    padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+  }
+}

@@ -44,6 +44,18 @@ describe('calendarTools', () => {
     }
   });
 
+  it('日をまたぐ予定', () => {
+    let doc = emptyDoc();
+    const r = addEvent(doc, { title: '夜勤', date: '2026-11-08', start: '17:00', end: '00:04', end_date: '2026-11-09' }, now, 'n1');
+    expect((r.result as { ok: boolean }).ok).toBe(true);
+    doc = applyOps(doc, r.ops);
+    expect(doc.events.n1).toMatchObject({ starts_at: '17:00', ends_at: '00:04', end_date: '2026-11-09' });
+    // 翌日だけを指定して一覧しても出る
+    expect((listEvents(doc, { from: '2026-11-09', to: '2026-11-09' }).result as { count: number }).count).toBe(1);
+    // end_date なしで end が start より前はエラー
+    expect((addEvent(doc, { title: 'x', date: '2026-11-08', start: '17:00', end: '00:04' }).result as { ok: boolean }).ok).toBe(false);
+  });
+
   it('Googleと同期済みの予定を消すと、Googleからも消す記録を残す', () => {
     const doc = emptyDoc();
     doc.events.g = { id: 'g', title: 'G', date: '2026-10-20', starts_at: '10:00', image: null, google_event_id: 'gid' };

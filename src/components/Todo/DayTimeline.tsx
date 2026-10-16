@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { isDeadlineEvent } from '../../lib/deadlineTasks';
+import { eventOccursOn, eventSliceOn } from '../../lib/eventSpan';
 import type { ForecastDay } from '../../lib/planner/forecast';
 import type { EventRow } from '../../types/event';
 import type { PlanItem } from '../../types/task';
@@ -21,7 +22,14 @@ type Row =
  */
 export function DayTimeline({ day, events, onToggle }: DayTimelineProps) {
   const [showDone, setShowDone] = useState(false);
-  const dayEvents = events.filter((e) => e.date === day.date && !e.task_id);
+  // 日をまたぐ予定は、この日にかかっている時間帯(前日から / 翌日まで)で出す
+  const dayEvents = events
+    .filter((e) => eventOccursOn(e, day.date) && !e.task_id)
+    .map((e) => {
+      const slice = eventSliceOn(e, day.date);
+      const title = `${e.title}${slice.continued ? '(前日から)' : ''}${slice.continues ? '(翌日まで)' : ''}`;
+      return { ...e, ...slice, ends_at: slice.ends_at === '24:00' ? null : slice.ends_at, title };
+    });
   const allDay = dayEvents.filter((e) => e.starts_at === '00:00' && !e.ends_at && !isDeadlineEvent(e));
 
   const rows: Row[] = [
