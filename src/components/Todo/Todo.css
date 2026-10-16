@@ -712,3 +712,75 @@
   border-radius: 8px;
   padding: 0 8px;
 }
+
+/* 期間中にやること(タスクごとに1行) */
+.week-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--accent-bg);
+}
+
+.week-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.week-summary-header h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-h);
+}
+
+.week-summary-header span {
+  font-size: 12px;
+}
+
+.week-summary ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.week-summary li {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.week-summary-deadline {
+  flex: none;
+  width: 5.2em;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.week-summary li.is-due .week-summary-deadline {
+  color: var(--danger);
+}
+
+.week-summary-deadline small,
+.week-summary-title small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.week-summary-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}

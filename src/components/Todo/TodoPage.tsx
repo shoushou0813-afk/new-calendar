@@ -13,6 +13,7 @@ import { DayTimeline } from './DayTimeline';
 import { DayTodoCard, formatMinutes } from './DayTodoCard';
 import { QuickScheduleDialog } from './QuickScheduleDialog';
 import { DeadlineImportDialog } from './DeadlineImportDialog';
+import { WeekSummary } from './WeekSummary';
 import { TaskForm } from './TaskForm';
 import './Todo.css';
 
@@ -59,7 +60,7 @@ export function TodoPage(props: TodoPageProps) {
   const [planning, setPlanning] = useState<'ai' | 'local' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [undo, setUndo] = useState<{ date: string; itemId: string; title: string } | null>(null);
+  const [undo, setUndo] = useState<{ date: string; itemIds: string[]; title: string } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | 'new' | null>(null);
   const [showDeadlineImport, setShowDeadlineImport] = useState(false);
 
@@ -80,6 +81,11 @@ export function TodoPage(props: TodoPageProps) {
   const days = useMemo(
     () => forecastDays({ startDate: dateKey, days: RANGE_DAYS[range], now: new Date(), tasks, events, settings, savedPlans: plans }),
     [dateKey, range, tasks, events, settings, plans],
+  );
+  // 「1週間でやること」はどの表示でも出す(1ヶ月表示ではその期間のまとめ)
+  const weekDays = useMemo(
+    () => (range === 'week' ? days : forecastDays({ startDate: dateKey, days: 7, now: new Date(), tasks, events, settings, savedPlans: plans })),
+    [range, days, dateKey, tasks, events, settings, plans],
   );
   const today = days[0];
   const plan = today?.plan ?? null;
@@ -112,36 +118,40 @@ export function TodoPage(props: TodoPageProps) {
     }
   };
 
-  /** 項目のチェックを切り替える。見込みの日なら、その日の計画として保存してから記録する。 */
-  const toggleInPlan = async (dayPlan: DayPlan, itemId: string) => {
-    const item = dayPlan.items.find((i) => i.id === itemId);
-    if (!item) return;
-    const nextDone = !item.done;
+  /**
+   * まとめた行(同じタスクの作業いくつか)のチェックを切り替える。見込みの日なら、その日の計画として保存してから記録する。
+   * チェックした分だけタスクの進捗(終わった時間)を進め、外したら戻す。
+   */
+  const toggleItems = async (dayPlan: DayPlan, itemIds: string[]) => {
+    const targets = dayPlan.items.filter((i) => itemIds.includes(i.id));
+    if (targets.length === 0) return null;
+    const nextDone = !targets[0].done;
     await persistPlan({
       ...dayPlan,
       created_at: dayPlan.created_at || new Date().toISOString(),
-      items: dayPlan.items.map((i) => (i.id === itemId ? { ...i, done: nextDone } : i)),
+      items: dayPlan.items.map((i) => (itemIds.includes(i.id) ? { ...i, done: nextDone } : i)),
     });
-    // チェックした分だけタスクの進捗(終わった時間)を進める
-    const task = tasks.find((t) => t.id === item.task_id);
-    if (task) {
-      const delta = nextDone ? itemMinutes(item) : -itemMinutes(item);
-      const spent = Math.max(0, Math.min(task.estimated_minutes, task.spent_minutes + delta));
+    const changed = targets.filter((i) => i.done !== nextDone);
+    const task = tasks.find((t) => t.id === targets[0].task_id);
+    if (task && changed.length > 0) {
+      const minutes = changed.reduce((s, i) => s + itemMinutes(i), 0);
+      const spent = Math.max(0, Math.min(task.estimated_minutes, task.spent_minutes + (nextDone ? minutes : -minutes)));
       await props.onUpdateTask(task.id, { spent_minutes: spent, done: spent >= task.estimated_minutes });
     }
-    return { nextDone, item };
+    return { nextDone, title: targets[0].title };
   };
 
-  const handleToggle = async (day: ForecastDay, item: PlanItem) => {
-    const r = await toggleInPlan(day.plan, item.id);
-    setUndo(r?.nextDone ? { date: day.date, itemId: item.id, title: item.title } : null);
+  const handleToggle = async (day: ForecastDay, items: PlanItem[]) => {
+    const ids = items.map((i) => i.id);
+    const r = await toggleItems(day.plan, ids);
+    setUndo(r?.nextDone ? { date: day.date, itemIds: ids, title: r.title } : null);
   };
 
   const handleUndo = async () => {
     if (!undo) return;
     const dayPlan = plans.get(undo.date);
     setUndo(null);
-    if (dayPlan) await toggleInPlan(dayPlan, undo.itemId);
+    if (dayPlan) await toggleItems(dayPlan, undo.itemIds);
   };
 
   const addPlanToCalendar = async () => {
@@ -256,7 +266,7 @@ export function TodoPage(props: TodoPageProps) {
                 ))}
               </ul>
             )}
-            <DayTimeline day={today} events={events} onToggle={(d, i) => void handleToggle(d, i)} />
+            <DayTimeline day={today} events={events} breakMinutes={settings.breakMinutes} onToggle={(d, i) => void handleToggle(d, i)} />
             <button type="button" className="todo-secondary" onClick={() => setShowQuick(true)}>
               1日の流れをまとめて入力
             </button>
@@ -265,15 +275,17 @@ export function TodoPage(props: TodoPageProps) {
                 この日のやることをカレンダーに入れる
               </button>
             )}
+            <WeekSummary title="1週間でやること" days={weekDays} tasks={tasks} />
           </>
         ) : (
           <>
+            <WeekSummary title={range === 'week' ? '1週間でやること' : '1ヶ月でやること'} days={days} tasks={tasks} />
             <p className="todo-hint">
               保存した計画がない日は、締切に間に合うよう自動で割り振った見込みです。前の日の分を予定どおり終えた前提で計算しています。
             </p>
             <div className="day-todo-list">
               {days.map((d) => (
-                <DayTodoCard key={d.date} day={d} compact onToggle={(day, i) => void handleToggle(day, i)} />
+                <DayTodoCard key={d.date} day={d} compact breakMinutes={settings.breakMinutes} onToggle={(day, i) => void handleToggle(day, i)} />
               ))}
             </div>
           </>

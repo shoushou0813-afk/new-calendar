@@ -157,7 +157,20 @@ export function CalendarPage() {
   return (
     <div className="calendar-page">
       <header className="calendar-page-header">
-        <h1>予定時刻ミス検知カレンダー</h1>
+        <div className="calendar-page-title-row">
+          <h1>予定時刻ミス検知カレンダー</h1>
+          <div className="calendar-page-tools">
+            <button type="button" onClick={() => void handleSync()} disabled={syncing}>
+              {syncing ? '同期中…' : '↻ Google同期'}
+            </button>
+            <button type="button" onClick={() => setShowImport(true)}>
+              インポート
+            </button>
+            <button type="button" onClick={() => setShowSettings(true)} aria-label="設定">
+              ⚙ 設定
+            </button>
+          </div>
+        </div>
         {cloud.state === 'off' ? (
           <p className="calendar-page-storage-note">この端末のブラウザ内にのみ保存されます</p>
         ) : (
@@ -176,22 +189,13 @@ export function CalendarPage() {
           カレンダー
         </button>
         <button type="button" className={tab === 'todo' ? 'is-active' : ''} onClick={() => setTab('todo')}>
-          今日のTodo
+          Todo
         </button>
         <button type="button" className={tab === 'money' ? 'is-active' : ''} onClick={() => setTab('money')}>
           家計簿
         </button>
         <button type="button" className={tab === 'noEvidence' ? 'is-active' : ''} onClick={() => setTab('noEvidence')}>
-          情報が足りない予定 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
-        </button>
-        <button type="button" className="calendar-page-import-button" onClick={() => void handleSync()} disabled={syncing}>
-          {syncing ? '同期中...' : 'Google同期'}
-        </button>
-        <button type="button" onClick={() => setShowImport(true)}>
-          インポート
-        </button>
-        <button type="button" onClick={() => setShowSettings(true)}>
-          設定
+          情報不足 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
         </button>
       </nav>
 

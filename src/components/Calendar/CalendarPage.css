@@ -11,10 +11,37 @@
 
 .calendar-page-header {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-page-title-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   flex-wrap: wrap;
+}
+
+/* Google同期・インポート・設定は、画面の切り替え(タブ)とは別に右上へ */
+.calendar-page-tools {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.calendar-page-tools button {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.calendar-page-tools button:disabled {
+  opacity: 0.6;
 }
 
 .calendar-page-header h1 {
@@ -40,9 +67,9 @@
 }
 
 .calendar-page-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .calendar-page-sync {
@@ -62,8 +89,9 @@
   border: 1px solid var(--border);
   background: var(--bg-panel);
   border-radius: 999px;
-  padding: 8px 16px;
+  padding: 8px 4px;
   font-size: 13px;
+  white-space: nowrap;
   color: var(--text);
 }
 
@@ -72,10 +100,6 @@
   border-color: var(--accent);
   color: white;
   font-weight: 600;
-}
-
-.calendar-page-import-button {
-  margin-left: auto;
 }
 
 .calendar-page-body {
