@@ -292,3 +292,69 @@ export function isCard(p: object): p is CardProfile {
 export function yen(n: number): string {
   return `¥${Math.round(n).toLocaleString('ja-JP')}`;
 }
+
+// ---- Gemini などが Google カレンダーに書いた「お金の予定」を読む ----
+// 例: 「【支出】楽天カード 1,280円 Amazon」(使った日に終日で入れる。説明欄に「分類: 食費」)
+//     「【引落】楽天カード 45,000円」(引き落とし日に入れる。確定した請求額)
+
+export const SPENDING_TAG = /^\s*【\s*(支出|クレカ|利用)\s*】/;
+export const BILL_TAG = /^\s*【\s*(引落|引き落とし|請求)\s*】/;
+const AMOUNT = /[¥￥]\s*([\d,]+)|([\d,]+)\s*円/;
+const EMONEY = /paypay|suica|pasmo|楽天ペイ|d払い|au ?pay|メルペイ|nanaco|waon|\biD\b|quicpay|icoca/i;
+
+export interface ParsedSpending {
+  amount: number;
+  method: TxMethod;
+  card: string | null;
+  memo: string | null;
+  category: string;
+  kind: TxKind;
+}
+
+function splitAmount(text: string): { before: string; amount: number; after: string } | null {
+  const m = AMOUNT.exec(text);
+  if (!m) return null;
+  const amount = Number((m[1] ?? m[2]).replace(/,/g, ''));
+  if (!(amount > 0)) return null;
+  return { before: text.slice(0, m.index).trim(), amount, after: text.slice(m.index + m[0].length).trim() };
+}
+
+/** 【支出】の予定名(と説明欄)から、家計簿の1件を読み取る。読めなければ null */
+export function parseSpendingEvent(title: string, note: string | null | undefined, cards: Pick<CardProfile, 'name'>[]): ParsedSpending | null {
+  if (!SPENDING_TAG.test(title)) return null;
+  const parts = splitAmount(title.replace(SPENDING_TAG, ''));
+  if (!parts) return null;
+  const who = parts.before.replace(/[・:：]+$/, '').trim();
+  const known = cards.find((c) => who && (who.includes(c.name) || c.name.includes(who)));
+  let method: TxMethod = 'credit';
+  if (/現金/.test(who)) method = 'cash';
+  else if (!known && EMONEY.test(who)) method = 'emoney';
+  else if (/口座|振込|振替|銀行/.test(who)) method = 'bank';
+  const category = /分類\s*[:：]\s*([^\s\n]+)/.exec(note ?? '')?.[1];
+  const refund = /返金|返品|キャンセル/.test(`${title} ${note ?? ''}`);
+  return {
+    amount: parts.amount,
+    method,
+    card: method === 'credit' ? (known?.name ?? (who || null)) : null,
+    memo: parts.after || (method === 'credit' ? null : who || null),
+    category: refund ? '収入' : category && EXPENSE_CATEGORIES.includes(category) ? category : 'その他',
+    kind: refund ? 'income' : 'expense',
+  };
+}
+
+/** 【引落】の予定名から、確定した引き落とし額を読み取る */
+export function parseBillEvent(title: string): { card: string; amount: number } | null {
+  if (!BILL_TAG.test(title)) return null;
+  const parts = splitAmount(title.replace(BILL_TAG, ''));
+  if (!parts) return null;
+  return { card: parts.before.replace(/[・:：]+$/, '').trim() || 'カード', amount: parts.amount };
+}
+
+/** 同じ支出をもう取り込んでいるか(Geminiが同じメールを2回書いても二重にしない) */
+export function isDuplicateSpending(txs: Transaction[], date: string, p: ParsedSpending, sourceId: string): boolean {
+  return txs.some(
+    (t) =>
+      t.source_id === sourceId ||
+      (t.source === 'gmail' && t.date === date && t.amount === p.amount && t.kind === p.kind && (t.memo ?? '') === (p.memo ?? '') && (t.card ?? '') === (p.card ?? '')),
+  );
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, parseISO, startOfMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useCategories } from '../../hooks/useCategories';
@@ -21,7 +21,8 @@ import { eventOccursOn, eventSliceOn } from '../../lib/eventSpan';
 import { useCloudStatus } from '../../hooks/useCloudStatus';
 import { useMoney } from '../../hooks/useMoney';
 import { MoneyPage } from '../Money/MoneyPage';
-import { cardPaymentDate, shiftForecasts, yen } from '../../../api/_lib/money';
+import { cardPaymentDate, isDuplicateSpending, parseSpendingEvent, SPENDING_TAG, shiftForecasts, yen } from '../../../api/_lib/money';
+import type { TransactionDraft } from '../../hooks/useMoney';
 import '../Money/Money.css';
 import type { EventDraft, EventRow } from '../../types/event';
 import './CalendarPage.css';
@@ -144,6 +145,36 @@ export function CalendarPage() {
   };
 
   /** その日のAI作業ブロックを入れ替える(前回の計画で入れたブロックは消す) */
+  // Gemini などが Google カレンダーに書いた「【支出】楽天カード 1,280円 Amazon」を家計簿に移す。
+  // 移したら予定は消す(Google同期のときに Google カレンダーからも消える)。同じものは二重に入れない。
+  const converting = useRef(false);
+  useEffect(() => {
+    if (!eventsReady || !money.ready || converting.current) return;
+    const spending = events.filter((e) => SPENDING_TAG.test(e.title));
+    if (spending.length === 0) return;
+    converting.current = true;
+    const drafts: TransactionDraft[] = [];
+    const done: string[] = [];
+    for (const e of spending) {
+      const parsed = parseSpendingEvent(e.title, e.note, money.cards);
+      if (!parsed) continue; // 金額が読めないものは予定のまま残す(見て直せるように)
+      done.push(e.id);
+      const sourceId = `gcal:${e.google_event_id ?? e.id}`;
+      const already = [...money.transactions, ...drafts.map((d) => ({ ...d, id: '', created_at: '', updated_at: '' }))];
+      if (isDuplicateSpending(already, e.date, parsed, sourceId)) continue;
+      drafts.push({ date: e.date, ...parsed, source: 'gmail', source_id: sourceId });
+    }
+    (async () => {
+      if (drafts.length > 0) await money.addTransactions(drafts);
+      if (done.length > 0) await deleteEvents(done);
+      if (drafts.length > 0) setSyncMessage({ kind: 'ok', text: `カレンダーの【支出】${drafts.length}件を家計簿に入れました。` });
+    })()
+      .catch(() => setSyncMessage({ kind: 'error', text: '【支出】の予定を家計簿に移せませんでした。' }))
+      .finally(() => {
+        converting.current = false;
+      });
+  }, [events, eventsReady, money, deleteEvents]);
+
   const replacePlanEvents = async (date: string, drafts: EventDraft[]) => {
     for (const old of events.filter((e) => e.date === date && e.task_id)) await deleteEvent(old.id);
     await importEvents(drafts);

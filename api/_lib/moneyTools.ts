@@ -9,6 +9,7 @@ import {
   makeCard,
   makeJob,
   monthSummary,
+  parseBillEvent,
   shiftForecasts,
   type CardProfile,
   type JobProfile,
@@ -172,6 +173,12 @@ export function moneySummary(doc: CloudDoc, args: { month?: string }, now = new 
       shifts: shifts
         .filter((s) => s.date.startsWith(month))
         .map((s) => ({ date: s.date, title: s.title, job: s.job, hours: +(s.pay.worked_minutes / 60).toFixed(2), total: s.pay.total, pay_date: s.pay_date })),
+      // Googleカレンダーに【引落】で入っている、確定した引き落とし額
+      confirmed_bills: Object.values(doc.events)
+        .filter((e) => String(e.date).startsWith(month))
+        .map((e) => ({ date: String(e.date), bill: parseBillEvent(String(e.title ?? '')) }))
+        .filter((b) => b.bill)
+        .map((b) => ({ date: b.date, ...b.bill! })),
       note: jobList(doc).length === 0 ? 'バイト先が未設定なのでバイト代は計算していません(set_job で設定)。' : undefined,
     },
   };

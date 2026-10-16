@@ -16,11 +16,14 @@ export type TransactionDraft = Omit<Transaction, 'id' | 'created_at' | 'updated_
 export function useMoney() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  /** 最初の読み込みが終わったか(重複チェックの前に必要) */
+  const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
     const [txs, ps] = await Promise.all([dbGetAllTransactions(), dbGetAllProfiles()]);
     setTransactions(txs.sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)));
     setProfiles(ps);
+    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -29,6 +32,13 @@ export function useMoney() {
     window.addEventListener(CLOUD_CHANGED_EVENT, onCloud);
     return () => window.removeEventListener(CLOUD_CHANGED_EVENT, onCloud);
   }, [reload]);
+
+  /** まとめて追加(Googleカレンダーからの取り込み用。読み直しは最後に1回) */
+  const addTransactions = async (drafts: TransactionDraft[]) => {
+    const now = new Date().toISOString();
+    for (const draft of drafts) await dbPutTransaction({ ...draft, id: crypto.randomUUID(), created_at: now, updated_at: now });
+    await reload();
+  };
 
   const saveTransaction = async (draft: TransactionDraft, id?: string) => {
     const now = new Date().toISOString();
@@ -54,5 +64,5 @@ export function useMoney() {
 
   const jobs: JobProfile[] = profiles.filter(isJob);
   const cards: CardProfile[] = profiles.filter(isCard);
-  return { transactions, jobs, cards, saveTransaction, deleteTransaction, saveProfile, deleteProfile };
+  return { ready, transactions, jobs, cards, addTransactions, saveTransaction, deleteTransaction, saveProfile, deleteProfile };
 }

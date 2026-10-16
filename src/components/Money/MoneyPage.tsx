@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { addMonths, format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { monthSummary, shiftForecasts, TX_METHOD_LABEL, yen, type Transaction, type TxMethod } from '../../../api/_lib/money';
+import { monthSummary, parseBillEvent, shiftForecasts, TX_METHOD_LABEL, yen, type Transaction, type TxMethod } from '../../../api/_lib/money';
 import { useMoney } from '../../hooks/useMoney';
 import type { EventRow } from '../../types/event';
 import { MoneySettingsDialog } from './MoneySettingsDialog';
@@ -46,7 +46,19 @@ export function MoneyPage({ events, money }: Props) {
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
   }, [shifts, month]);
 
-  const cardTotal = summary.card_payments.reduce((s, p) => s + p.amount, 0);
+  // Googleカレンダーの【引落】(メールで届いた確定額)。同じカードの見込みより優先する
+  const bills = events
+    .filter((e) => e.date.startsWith(month))
+    .map((e) => ({ date: e.date, bill: parseBillEvent(e.title) }))
+    .filter((b): b is { date: string; bill: { card: string; amount: number } } => b.bill !== null);
+  const sameCard = (a: string, b: string) => a.includes(b) || b.includes(a);
+  const cardPayments = [
+    ...summary.card_payments
+      .filter((p) => !bills.some((b) => sameCard(b.bill.card, p.card)))
+      .map((p) => ({ ...p, confirmed: false })),
+    ...bills.map((b) => ({ card: b.bill.card, date: b.date, amount: b.bill.amount, confirmed: true })),
+  ];
+  const cardTotal = cardPayments.reduce((s, p) => s + p.amount, 0);
   const categories = Object.entries(summary.expense_by_category).sort((a, b) => b[1] - a[1]);
   const maxCategory = categories[0]?.[1] ?? 0;
   const byDate = new Map<string, Transaction[]>();
@@ -109,12 +121,12 @@ export function MoneyPage({ events, money }: Props) {
         </div>
       </section>
 
-      {(summary.card_payments.length > 0 || paydays.length > 0) && (
+      {(cardPayments.length > 0 || paydays.length > 0) && (
         <section className="todo-panel">
           <h2>この月のお金の予定</h2>
           <ul className="money-list">
             {[
-              ...summary.card_payments.map((p) => ({ date: p.date, label: `💳 ${p.card} 引き落とし`, amount: -p.amount })),
+              ...cardPayments.map((p) => ({ date: p.date, label: `💳 ${p.card} 引き落とし${p.confirmed ? '(確定)' : '(見込み)'}`, amount: -p.amount })),
               ...paydays.map((p) => ({ date: p.date, label: `💰 ${p.job} 給料日(見込み)`, amount: p.amount })),
             ]
               .sort((a, b) => a.date.localeCompare(b.date))

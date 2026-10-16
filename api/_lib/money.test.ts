@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { cardPaymentDate, jobPayDate, makeCard, makeJob, monthSummary, shiftForecasts, shiftPay, type Transaction } from './money';
+import {
+  cardPaymentDate,
+  isDuplicateSpending,
+  jobPayDate,
+  makeCard,
+  makeJob,
+  monthSummary,
+  parseBillEvent,
+  parseSpendingEvent,
+  shiftForecasts,
+  shiftPay,
+  type Transaction,
+} from './money';
 
 const job = makeJob({ name: 'コンビニ', hourly_wage: 1200, transport: 300, closing_day: 31, pay_day: 25 });
 
@@ -88,5 +100,36 @@ describe('monthSummary', () => {
     expect(s.income_total).toBe(800);
     expect(s.card_payments).toEqual([{ card: '楽天', date: '2026-10-27', amount: 3000 }]);
     expect(monthSummary('2026-11', txs, [], [card]).card_payments).toEqual([{ card: '楽天', date: '2026-11-27', amount: 2000 }]);
+  });
+});
+
+describe('Googleカレンダーに書かれたお金の予定', () => {
+  const cards = [{ name: '楽天カード' }];
+  it('【支出】の予定名からクレカの支出を読む', () => {
+    expect(parseSpendingEvent('【支出】楽天カード 1,280円 Amazon', '分類: 食費', cards)).toEqual({
+      amount: 1280,
+      method: 'credit',
+      card: '楽天カード',
+      memo: 'Amazon',
+      category: '食費',
+      kind: 'expense',
+    });
+    expect(parseSpendingEvent('【支出】楽天 ¥500 セブン', null, cards)).toMatchObject({ card: '楽天カード', amount: 500, category: 'その他' });
+    expect(parseSpendingEvent('【支出】PayPay 300円 ローソン', null, cards)).toMatchObject({ method: 'emoney', card: null, memo: 'ローソン' });
+    expect(parseSpendingEvent('【支出】楽天カード 2000円 返金 Amazon', null, cards)).toMatchObject({ kind: 'income' });
+  });
+  it('タグがない・金額がないものは読まない', () => {
+    expect(parseSpendingEvent('楽天カード 1,280円', null, cards)).toBeNull();
+    expect(parseSpendingEvent('【支出】楽天カード', null, cards)).toBeNull();
+  });
+  it('【引落】から確定した請求額を読む', () => {
+    expect(parseBillEvent('【引落】楽天カード 45,000円')).toEqual({ card: '楽天カード', amount: 45000 });
+    expect(parseBillEvent('楽天カード 45,000円')).toBeNull();
+  });
+  it('同じ日・金額・店・カードの支出は重複とみなす', () => {
+    const p = parseSpendingEvent('【支出】楽天カード 1,280円 Amazon', null, cards)!;
+    const t = tx({ date: '2026-10-10', amount: 1280, method: 'credit', card: '楽天カード', memo: 'Amazon', source: 'gmail', source_id: 'gcal:x' });
+    expect(isDuplicateSpending([t], '2026-10-10', p, 'gcal:y')).toBe(true);
+    expect(isDuplicateSpending([t], '2026-10-11', p, 'gcal:y')).toBe(false);
   });
 });
