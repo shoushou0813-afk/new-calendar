@@ -45,46 +45,54 @@ export function WeekSummary({ title, days, tasks, onComplete }: Props) {
   const list = [...rows.values()].sort(
     (a, b) => a.task.deadline.localeCompare(b.task.deadline) || (a.task.deadline_time ?? '99').localeCompare(b.task.deadline_time ?? '99'),
   );
+  // この期間が締切のものを上に。先の締切のために進めておくものは、たたんで別に出す
+  const due = list.filter((r) => r.task.deadline <= to);
+  const later = list.filter((r) => r.task.deadline > to);
   const total = list.reduce((s, r) => s + r.minutes, 0);
+  const row = ({ task, minutes, dayCount }: Row) => {
+    const left = differenceInCalendarDays(parseISO(task.deadline), parseISO(from));
+    const dueInRange = task.deadline <= to;
+    const remaining = task.estimated_minutes - task.spent_minutes;
+    return (
+      <li key={task.id} className={dueInRange ? 'is-due' : ''}>
+        <input
+          type="checkbox"
+          className="todo-task-check"
+          checked={false}
+          onChange={() => onComplete(task.id)}
+          aria-label={`${task.title}を完了にする`}
+        />
+        <span className="week-summary-deadline">
+          {format(parseISO(task.deadline), 'M/d(EEE)', { locale: ja })}
+          <small>{left < 0 ? '超過' : left === 0 ? '今日締切' : `あと${left}日`}</small>
+        </span>
+        <span className="week-summary-title">
+          {task.title}
+          <small>
+            {minutes > 0 ? `この期間に ${formatMinutes(minutes)}(${dayCount}日に分けて)` : 'この期間の作業なし'}
+            {remaining > minutes ? ` ・ 全体の残り ${formatMinutes(remaining)}` : ''}
+          </small>
+        </span>
+      </li>
+    );
+  };
 
   return (
     <div className="week-summary">
       <div className="week-summary-header">
         <h3>{title}</h3>
-        <span>{list.length > 0 ? `${list.length}件・合計 ${formatMinutes(total)}` : ''}</span>
+        <span>{due.length > 0 ? `締切${due.length}件・作業 ${formatMinutes(total)}` : ''}</span>
       </div>
-      {list.length === 0 ? (
-        <p className="todo-hint">この期間にやることはありません</p>
+      {due.length === 0 ? (
+        <p className="todo-hint">この期間が締切のものはありません</p>
       ) : (
-        <ul>
-          {list.map(({ task, minutes, dayCount }) => {
-            const left = differenceInCalendarDays(parseISO(task.deadline), parseISO(from));
-            const dueInRange = task.deadline <= to;
-            const remaining = task.estimated_minutes - task.spent_minutes;
-            return (
-              <li key={task.id} className={dueInRange ? 'is-due' : ''}>
-                <input
-                  type="checkbox"
-                  className="todo-task-check"
-                  checked={false}
-                  onChange={() => onComplete(task.id)}
-                  aria-label={`${task.title}を完了にする`}
-                />
-                <span className="week-summary-deadline">
-                  {format(parseISO(task.deadline), 'M/d(EEE)', { locale: ja })}
-                  <small>{left < 0 ? '超過' : left === 0 ? '今日締切' : `あと${left}日`}</small>
-                </span>
-                <span className="week-summary-title">
-                  {task.title}
-                  <small>
-                    {minutes > 0 ? `この期間に ${formatMinutes(minutes)}(${dayCount}日に分けて)` : 'この期間の作業なし'}
-                    {remaining > minutes ? ` ・ 全体の残り ${formatMinutes(remaining)}` : ''}
-                  </small>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        <ul>{due.map(row)}</ul>
+      )}
+      {later.length > 0 && (
+        <details className="week-summary-later">
+          <summary>先の締切のために進めておくもの({later.length}件)</summary>
+          <ul>{later.map(row)}</ul>
+        </details>
       )}
     </div>
   );

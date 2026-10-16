@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, differenceInCalendarDays, format, isToday, parseISO, startOfToday } from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, format, isToday, parseISO, startOfToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { usePlans } from '../../hooks/usePlans';
 import { forecastDays, type ForecastDay } from '../../lib/planner/forecast';
@@ -219,21 +219,50 @@ export function TodoPage(props: TodoPageProps) {
     await props.onDeleteTask(task.id);
   };
 
+  /** ‹ › とスワイプ: 今日表示は1日、1週間表示は1週間、1ヶ月表示は1ヶ月ずつ動く */
+  const step = (dir: 1 | -1) =>
+    setDate((d) => (range === 'day' ? addDays(d, dir) : range === 'week' ? addDays(d, 7 * dir) : addMonths(d, dir)));
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  };
+  // 左にスワイプ → 先へ、右にスワイプ → 前へ。縦スクロールと区別するため横の動きが大きいときだけ
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    step(dx < 0 ? 1 : -1);
+  };
+
   const rangeLabel = range === 'day' ? 'のやること' : range === 'week' ? 'から1週間' : 'から1ヶ月';
 
   return (
     <div className="todo-page">
-      <section className="todo-panel">
+      <section className="todo-panel" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div className="todo-panel-header">
           <div className="todo-date-nav">
-            <button type="button" onClick={() => setDate((d) => addDays(d, -1))} aria-label="前の日">
+            <button type="button" onClick={() => step(-1)} aria-label="前へ">
               ‹
             </button>
-            <h2>
-              {format(date, 'M月d日(EEE)', { locale: ja })}
-              {rangeLabel}
-            </h2>
-            <button type="button" onClick={() => setDate((d) => addDays(d, 1))} aria-label="次の日">
+            {/* 日付を押すとカレンダーが開いて、好きな日(11月など)へ一気に飛べる */}
+            <label className="todo-date-jump">
+              <h2>
+                {format(date, 'M月d日(EEE)', { locale: ja })}
+                {rangeLabel} ▾
+              </h2>
+              <input
+                type="date"
+                value={dateKey}
+                onChange={(e) => e.target.value && setDate(parseISO(e.target.value))}
+                aria-label="日付を選んで移動"
+              />
+            </label>
+            <button type="button" onClick={() => step(1)} aria-label="先へ">
               ›
             </button>
             {!isToday(date) && (
