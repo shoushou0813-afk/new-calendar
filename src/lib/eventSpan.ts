@@ -7,9 +7,22 @@ import type { EventRow } from '../types/event';
  */
 type Spanning = Pick<EventRow, 'date' | 'starts_at' | 'ends_at'> & { end_date?: string | null; doors_at?: string | null };
 
+/**
+ * 「翌日の 0:00 に終わる」予定(20:00〜24:00 など)は、日をまたがずその日の終わりまでの予定として扱う。
+ */
+export function endsAtMidnight(e: Spanning): boolean {
+  return !!e.end_date && e.ends_at === '00:00' && e.end_date === format(addDays(parseISO(e.date), 1), 'yyyy-MM-dd') && e.starts_at !== '00:00';
+}
+
 /** 予定が終わる日(同じ日に終わるなら date) */
 export function eventEndDate(e: Spanning): string {
+  if (endsAtMidnight(e)) return e.date;
   return e.end_date && e.end_date > e.date ? e.end_date : e.date;
+}
+
+/** 表示用の終了時刻(24時ちょうどに終わる予定は「24:00」) */
+export function displayEnd(e: Spanning): string | null {
+  return endsAtMidnight(e) ? '24:00' : e.ends_at;
 }
 
 export function isMultiDay(e: Spanning): boolean {
@@ -32,7 +45,7 @@ export function eventDays(e: Spanning): string[] {
  * 最後の日は 0:00〜終了時刻 になる。「24:00」は1日の終わりを表す。
  */
 export function eventSliceOn(e: Spanning, day: string): { doors_at: string | null; starts_at: string; ends_at: string | null; continued: boolean; continues: boolean } {
-  if (!isMultiDay(e)) return { doors_at: e.doors_at ?? null, starts_at: e.starts_at, ends_at: e.ends_at, continued: false, continues: false };
+  if (!isMultiDay(e)) return { doors_at: e.doors_at ?? null, starts_at: e.starts_at, ends_at: displayEnd(e), continued: false, continues: false };
   const first = day === e.date;
   const last = day === eventEndDate(e);
   return {

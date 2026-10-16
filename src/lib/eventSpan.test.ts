@@ -20,4 +20,12 @@ describe('eventSpan', () => {
     expect(eventSliceOn(threeDays, '2026-10-25')).toMatchObject({ starts_at: '00:00', ends_at: '24:00' });
     expect(eventSliceOn(sameDay, '2026-10-20')).toMatchObject({ starts_at: '10:00', ends_at: '11:00', continued: false, continues: false });
   });
+
+  it('24時ちょうどに終わる予定は日をまたがない', () => {
+    const shift = { date: '2026-10-01', starts_at: '20:00', ends_at: '00:00', end_date: '2026-10-02' };
+    expect(eventEndDate(shift)).toBe('2026-10-01');
+    expect(eventOccursOn(shift, '2026-10-02')).toBe(false);
+    expect(eventDays(shift)).toEqual(['2026-10-01']);
+    expect(eventSliceOn(shift, '2026-10-01')).toMatchObject({ starts_at: '20:00', ends_at: '24:00', continues: false });
+  });
 });

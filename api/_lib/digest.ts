@@ -31,7 +31,9 @@ function linesBetween(doc: CloudDoc, from: string, to: string): Line[] {
   for (const e of Object.values(doc.events)) {
     if (e.task_id) continue;
     const start = String(e.date);
-    const end = e.end_date && String(e.end_date) > start ? String(e.end_date) : start;
+    // 翌日 0:00 に終わる予定(〜24:00)は、日をまたがない
+    const midnight = e.ends_at === '00:00' && e.starts_at !== '00:00' && String(e.end_date) === addDaysStr(start, 1);
+    const end = !midnight && e.end_date && String(e.end_date) > start ? String(e.end_date) : start;
     if (start > to || end < from) continue;
     const date = start < from ? from : start;
     const allDay = e.starts_at === '00:00' && !e.ends_at;

@@ -3,7 +3,7 @@ import { ja } from 'date-fns/locale';
 import type { EventRow } from '../../types/event';
 import { hasNoEvidence } from '../../lib/validation';
 import { toEventInput } from '../../lib/eventMapper';
-import { eventEndDate, isMultiDay } from '../../lib/eventSpan';
+import { displayEnd, eventEndDate, isMultiDay } from '../../lib/eventSpan';
 import './EventCard.css';
 
 interface EventCardProps {
@@ -32,7 +32,7 @@ export function EventCard({ event, showDate, onEdit, onDelete }: EventCardProps)
               終了 {format(parseISO(eventEndDate(event)), 'M/d', { locale: ja })} {event.ends_at ?? ''}
             </span>
           ) : (
-            event.ends_at && <span>終了 {event.ends_at}</span>
+            event.ends_at && <span>終了 {displayEnd(event)}</span>
           )}
         </div>
       </div>

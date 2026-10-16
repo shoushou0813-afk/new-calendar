@@ -19,8 +19,11 @@ export function googleToFields(ge: GoogleEvent): Pick<EventRow, 'title' | 'date'
       const endDay = format(end, 'yyyy-MM-dd');
       const nextDay = format(addDays(parseISO(date), 1), 'yyyy-MM-dd');
       if (endDay === date) endsAt = format(end, 'HH:mm');
-      // ちょうど翌日 0:00 に終わる予定は、その日の終わり(23:59)までの予定として持つ
-      else if (endDay === nextDay && format(end, 'HH:mm') === '00:00') endsAt = '23:59';
+      // ちょうど翌日 0:00 に終わる予定は、日をまたがない「〜24:00」の予定として持つ(画面では同じ日だけに出る)
+      else if (endDay === nextDay && format(end, 'HH:mm') === '00:00') {
+        endsAt = '00:00';
+        endDate = endDay;
+      }
       else if (endDay > date) {
         endDate = endDay;
         endsAt = format(end, 'HH:mm');
@@ -58,7 +61,8 @@ export function localToGoogle(row: EventRow, timeZone: string): GoogleEventInput
     };
   }
   const startMin = toMinutes(row.starts_at);
-  let endMin = row.ends_at ? toMinutes(row.ends_at) : startMin + 60;
+  // 24時ちょうど(翌日 0:00)に終わる予定は、翌日の 0:00 までとして送る
+  let endMin = row.ends_at ? (row.ends_at === '00:00' && startMin > 0 ? 24 * 60 : toMinutes(row.ends_at)) : startMin + 60;
   if (endMin <= startMin) endMin = startMin + 60;
   const endDate = endMin >= 24 * 60 ? format(addDays(parseISO(row.date), 1), 'yyyy-MM-dd') : row.date;
   return {

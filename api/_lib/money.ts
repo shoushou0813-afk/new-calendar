@@ -120,6 +120,7 @@ export function shiftPay(shift: ShiftInput, job: Pick<JobProfile, 'hourly_wage' 
   const days = shift.end_date && shift.end_date > shift.date ? Math.round((Date.parse(shift.end_date) - Date.parse(shift.date)) / 86400000) : 0;
   let end = toMinutes(shift.end) + days * 1440;
   if (end <= start) end += 1440; // 終了日なしで終わりが始まりより前なら、翌日まで
+  if (days === 0 && shift.end === '23:59') end = 1440; // 「〜23:59」は24時までとみなす
   const span = end - start;
   const breakMinutes = span > 8 * 60 ? 60 : span > 6 * 60 ? 45 : 0;
 

@@ -14,6 +14,7 @@ const doc = applyOps(emptyDoc(), [
   ev('3', '祝日', '2026-10-21', '00:00', null),
   ev('4', '【作業】ES', '2026-10-19', '10:00', '11:00', { task_id: 't' }),
   ev('5', '夜勤', '2026-10-18', '22:00', '05:00', { end_date: '2026-10-19' }),
+  ev('6', 'バイト', '2026-10-18', '20:00', '00:00', { end_date: '2026-10-19' }),
   { op: 'put', collection: 'tasks', record: { id: 't', title: '日鉄 ES', deadline: '2026-10-19', deadline_time: null, done: false } },
 ]);
 

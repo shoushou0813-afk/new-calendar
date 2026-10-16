@@ -42,7 +42,11 @@ describe('googleToFields / localToGoogle', () => {
     ).toMatchObject({ date: '2026-11-08', starts_at: '17:00', ends_at: '00:04', end_date: '2026-11-09' });
     expect(
       googleToFields({ id: 'x', start: { dateTime: '2026-11-08T17:00:00+09:00' }, end: { dateTime: '2026-11-09T00:00:00+09:00' } }),
-    ).toMatchObject({ ends_at: '23:59', end_date: null });
+    ).toMatchObject({ ends_at: '00:00', end_date: '2026-11-09' });
+    expect(localToGoogle(row({ date: '2026-11-08', starts_at: '20:00', ends_at: '00:00', end_date: '2026-11-09' }), 'Asia/Tokyo')).toMatchObject({
+      start: { dateTime: '2026-11-08T20:00:00' },
+      end: { dateTime: '2026-11-09T00:00:00' },
+    });
     expect(googleToFields({ id: 'x', start: { date: '2026-10-24' }, end: { date: '2026-10-26' } })).toMatchObject({
       date: '2026-10-24',
       end_date: '2026-10-25',
