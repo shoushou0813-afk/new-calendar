@@ -9,6 +9,8 @@ interface Props {
   title: string;
   days: ForecastDay[];
   tasks: Task[];
+  /** チェックしたら課題そのものを完了にする */
+  onComplete: (taskId: string) => void;
 }
 
 interface Row {
@@ -18,7 +20,7 @@ interface Row {
 }
 
 /** 期間中にやることを、タスクごとに1行(締切順)でまとめる */
-export function WeekSummary({ title, days, tasks }: Props) {
+export function WeekSummary({ title, days, tasks, onComplete }: Props) {
   if (days.length === 0) return null;
   const from = days[0].date;
   const to = days[days.length - 1].date;
@@ -61,6 +63,13 @@ export function WeekSummary({ title, days, tasks }: Props) {
             const remaining = task.estimated_minutes - task.spent_minutes;
             return (
               <li key={task.id} className={dueInRange ? 'is-due' : ''}>
+                <input
+                  type="checkbox"
+                  className="todo-task-check"
+                  checked={false}
+                  onChange={() => onComplete(task.id)}
+                  aria-label={`${task.title}を完了にする`}
+                />
                 <span className="week-summary-deadline">
                   {format(parseISO(task.deadline), 'M/d(EEE)', { locale: ja })}
                   <small>{left < 0 ? '超過' : left === 0 ? '今日締切' : `あと${left}日`}</small>

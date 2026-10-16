@@ -60,7 +60,10 @@ export function TodoPage(props: TodoPageProps) {
   const [planning, setPlanning] = useState<'ai' | 'local' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [undo, setUndo] = useState<{ date: string; itemIds: string[]; title: string } | null>(null);
+  // 直前のチェック。items: その日の作業をチェックした / task: 課題ごと完了にした
+  const [undo, setUndo] = useState<
+    { kind: 'items'; date: string; itemIds: string[]; taskId: string; title: string } | { kind: 'task'; taskId: string; title: string } | null
+  >(null);
   const [editingTask, setEditingTask] = useState<Task | 'new' | null>(null);
   const [showDeadlineImport, setShowDeadlineImport] = useState(false);
 
@@ -138,19 +141,31 @@ export function TodoPage(props: TodoPageProps) {
       const spent = Math.max(0, Math.min(task.estimated_minutes, task.spent_minutes + (nextDone ? minutes : -minutes)));
       await props.onUpdateTask(task.id, { spent_minutes: spent, done: spent >= task.estimated_minutes });
     }
-    return { nextDone, title: targets[0].title };
+    return { nextDone, title: targets[0].title, taskId: targets[0].task_id };
   };
 
   const handleToggle = async (day: ForecastDay, items: PlanItem[]) => {
     const ids = items.map((i) => i.id);
     const r = await toggleItems(day.plan, ids);
-    setUndo(r?.nextDone ? { date: day.date, itemIds: ids, title: r.title } : null);
+    setUndo(r?.nextDone ? { kind: 'items', date: day.date, itemIds: ids, taskId: r.taskId, title: r.title } : null);
+  };
+
+  /** 課題そのものを完了にする(残りの作業は全部の日の一覧から消える) */
+  const completeTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    await props.onUpdateTask(task.id, { done: true });
+    setUndo({ kind: 'task', taskId: task.id, title: task.title });
   };
 
   const handleUndo = async () => {
     if (!undo) return;
-    const dayPlan = plans.get(undo.date);
     setUndo(null);
+    if (undo.kind === 'task') {
+      await props.onUpdateTask(undo.taskId, { done: false });
+      return;
+    }
+    const dayPlan = plans.get(undo.date);
     if (dayPlan) await toggleItems(dayPlan, undo.itemIds);
   };
 
@@ -242,12 +257,19 @@ export function TodoPage(props: TodoPageProps) {
         {error && <p className="todo-error">{error}</p>}
         {notice && <p className="todo-notice">{notice}</p>}
         {undo && (
-          <p className="todo-undo">
-            「{undo.title}」を完了にしました
-            <button type="button" className="todo-link" onClick={() => void handleUndo()}>
-              元に戻す
-            </button>
-          </p>
+          <div className="todo-undo">
+            <span>{undo.kind === 'task' ? `「${undo.title}」の課題を完了にしました` : `「${undo.title}」のこの日の分を完了にしました`}</span>
+            <span className="todo-undo-actions">
+              {undo.kind === 'items' && tasks.some((t) => t.id === undo.taskId && !t.done) && (
+                <button type="button" className="todo-link" onClick={() => void completeTask(undo.taskId)}>
+                  課題ごと完了
+                </button>
+              )}
+              <button type="button" className="todo-link" onClick={() => void handleUndo()}>
+                元に戻す
+              </button>
+            </span>
+          </div>
         )}
 
         {range === 'day' && today ? (
@@ -275,11 +297,16 @@ export function TodoPage(props: TodoPageProps) {
                 この日のやることをカレンダーに入れる
               </button>
             )}
-            <WeekSummary title="1週間でやること" days={weekDays} tasks={tasks} />
+            <WeekSummary title="1週間でやること" days={weekDays} tasks={tasks} onComplete={(id) => void completeTask(id)} />
           </>
         ) : (
           <>
-            <WeekSummary title={range === 'week' ? '1週間でやること' : '1ヶ月でやること'} days={days} tasks={tasks} />
+            <WeekSummary
+              title={range === 'week' ? '1週間でやること' : '1ヶ月でやること'}
+              days={days}
+              tasks={tasks}
+              onComplete={(id) => void completeTask(id)}
+            />
             <p className="todo-hint">
               保存した計画がない日は、締切に間に合うよう自動で割り振った見込みです。前の日の分を予定どおり終えた前提で計算しています。
             </p>
@@ -314,6 +341,13 @@ export function TodoPage(props: TodoPageProps) {
               const progress = Math.round((task.spent_minutes / task.estimated_minutes) * 100);
               return (
                 <li key={task.id} className={info && (info.shortage > 0 || info.overdue) ? 'is-risk' : ''}>
+                  <input
+                    type="checkbox"
+                    className="todo-task-check"
+                    checked={false}
+                    onChange={() => void completeTask(task.id)}
+                    aria-label={`${task.title}を完了にする`}
+                  />
                   <div className="todo-task-main" onClick={() => setEditingTask(task)}>
                     <div className="todo-task-top">
                       <span className={`todo-priority is-${task.priority}`}>{PRIORITY_LABEL[task.priority]}</span>
@@ -329,9 +363,6 @@ export function TodoPage(props: TodoPageProps) {
                     </div>
                   </div>
                   <div className="todo-task-actions">
-                    <button type="button" className="todo-secondary" onClick={() => void props.onUpdateTask(task.id, { done: true })}>
-                      完了
-                    </button>
                     <button type="button" className="todo-danger" onClick={() => void handleDeleteTask(task)}>
                       削除
                     </button>

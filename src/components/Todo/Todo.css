@@ -784,3 +784,26 @@
   color: var(--text-h);
   overflow-wrap: anywhere;
 }
+
+/* 課題そのものを完了にするチェック */
+.todo-task-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.week-summary li {
+  align-items: flex-start;
+}
+
+.week-summary .todo-task-check {
+  margin-top: 2px;
+}
+
+.todo-undo-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
