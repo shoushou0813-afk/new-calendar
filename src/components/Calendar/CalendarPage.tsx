@@ -19,10 +19,14 @@ import { clearImportLink, readImportLink } from '../../lib/importLink';
 import { configureCloud, syncNow } from '../../lib/cloud/cloudSync';
 import { eventOccursOn, eventSliceOn } from '../../lib/eventSpan';
 import { useCloudStatus } from '../../hooks/useCloudStatus';
+import { useMoney } from '../../hooks/useMoney';
+import { MoneyPage } from '../Money/MoneyPage';
+import { cardPaymentDate, shiftForecasts, yen } from '../../../api/_lib/money';
+import '../Money/Money.css';
 import type { EventDraft, EventRow } from '../../types/event';
 import './CalendarPage.css';
 
-type Tab = 'calendar' | 'todo' | 'noEvidence';
+type Tab = 'calendar' | 'todo' | 'money' | 'noEvidence';
 
 export function CalendarPage() {
   const { events, loading, reload, createEvent, updateEvent, deleteEvent, deleteEvents, importEvents } = useEvents();
@@ -40,6 +44,8 @@ export function CalendarPage() {
   const [showImport, setShowImport] = useState(false);
   const [linkIcsText, setLinkIcsText] = useState<string | null>(null);
   const cloud = useCloudStatus();
+  const money = useMoney();
+  const shifts = useMemo(() => shiftForecasts(events, money.jobs), [events, money.jobs]);
 
   // 合言葉が設定されていればネット保存を始める
   useEffect(() => {
@@ -79,6 +85,26 @@ export function CalendarPage() {
     },
     [events, selectedDate],
   );
+
+  /** 選んだ日のお金(使った額・シフトの見込み・カード引き落とし・給料日) */
+  const dayMoney = useMemo(() => {
+    const day = format(selectedDate, 'yyyy-MM-dd');
+    const spent = money.transactions.filter((t) => t.date === day && t.kind === 'expense').reduce((s, t) => s + t.amount, 0);
+    const shiftPay = shifts.filter((s) => s.date === day).reduce((s, x) => s + x.pay.total, 0);
+    const payday = shifts.filter((s) => s.pay_date === day).reduce((s, x) => s + x.pay.total, 0);
+    let cardPay = 0;
+    for (const t of money.transactions) {
+      if (t.kind !== 'expense' || t.method !== 'credit') continue;
+      const card = money.cards.find((c) => c.name === t.card) ?? money.cards[0];
+      if (card && cardPaymentDate(t.date, card) === day) cardPay += t.amount;
+    }
+    return [
+      spent > 0 && { label: 'この日に使った', value: yen(spent) },
+      shiftPay > 0 && { label: 'バイト代(見込み)', value: `+${yen(shiftPay)}` },
+      cardPay > 0 && { label: '💳 カード引き落とし', value: `-${yen(cardPay)}` },
+      payday > 0 && { label: '💰 給料日(見込み)', value: `+${yen(payday)}` },
+    ].filter((x): x is { label: string; value: string } => Boolean(x));
+  }, [selectedDate, money.transactions, money.cards, shifts]);
 
   const noEvidenceEvents = useMemo(
     () => events.filter((e) => !e.task_id && hasNoEvidence(toEventInput(e))).sort((a, b) => a.date.localeCompare(b.date)),
@@ -152,6 +178,9 @@ export function CalendarPage() {
         <button type="button" className={tab === 'todo' ? 'is-active' : ''} onClick={() => setTab('todo')}>
           今日のTodo
         </button>
+        <button type="button" className={tab === 'money' ? 'is-active' : ''} onClick={() => setTab('money')}>
+          家計簿
+        </button>
         <button type="button" className={tab === 'noEvidence' ? 'is-active' : ''} onClick={() => setTab('noEvidence')}>
           情報が足りない予定 {noEvidenceEvents.length > 0 && `(${noEvidenceEvents.length})`}
         </button>
@@ -178,6 +207,16 @@ export function CalendarPage() {
                 + 予定を追加
               </button>
             </div>
+            {dayMoney.length > 0 && (
+              <ul className="calendar-page-money">
+                {dayMoney.map((m) => (
+                  <li key={m.label}>
+                    <span>{m.label}</span>
+                    <b>{m.value}</b>
+                  </li>
+                ))}
+              </ul>
+            )}
             {loading ? (
               <p className="calendar-page-hint">読み込み中...</p>
             ) : dayEvents.length === 0 ? (
@@ -204,6 +243,8 @@ export function CalendarPage() {
           onImportEvents={importEvents}
           onOpenSettings={() => setShowSettings(true)}
         />
+      ) : tab === 'money' ? (
+        <MoneyPage events={events} money={money} />
       ) : (
         <div className="calendar-page-list">
           <p className="calendar-page-hint">

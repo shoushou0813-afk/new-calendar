@@ -1,0 +1,180 @@
+.money-page h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.money-page .todo-panel-header h2 {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.money-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.money-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.money-stat span {
+  font-size: 0.8rem;
+}
+
+.money-stat strong {
+  font-size: 1.25rem;
+  color: var(--text-h);
+}
+
+.money-stat small {
+  font-size: 0.75rem;
+}
+
+.money-stat.is-plus strong,
+.money-amount.is-plus {
+  color: #15803d;
+}
+
+.money-stat.is-minus strong,
+.money-amount.is-minus {
+  color: var(--danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  .money-stat.is-plus strong,
+  .money-amount.is-plus {
+    color: #4ade80;
+  }
+}
+
+.money-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.money-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.money-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.money-list li[role='button'] {
+  cursor: pointer;
+}
+
+.money-date {
+  flex: none;
+  width: 4.6em;
+  font-size: 0.85rem;
+}
+
+.money-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.money-title small {
+  display: block;
+  color: var(--text);
+  font-size: 0.75rem;
+}
+
+.money-amount {
+  flex: none;
+  font-weight: 600;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.money-badge {
+  flex: none;
+  max-width: 6em;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.money-day h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+}
+
+.money-bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.money-bars li {
+  display: grid;
+  grid-template-columns: 6em 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.85rem;
+}
+
+.money-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.money-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.money-kind {
+  display: flex;
+  gap: 8px;
+}
+
+.money-kind button {
+  flex: 1;
+}
+
+.calendar-page-money {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.calendar-page-money li {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}

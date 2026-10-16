@@ -9,29 +9,35 @@ export type CloudEvent = Record<string, unknown> & { id: string; image: string |
 export interface CloudDoc {
   version: 1;
   events: Record<string, CloudEvent>;
-  tasks: Record<string, Record<string, unknown> & { id: string }>;
+  tasks: Record<string, IdRecord>;
   /** 1日の計画(キーは日付 yyyy-MM-dd) */
   plans: Record<string, Record<string, unknown> & { date: string }>;
   categories: string[];
   /** Googleから消すべき予定のID(Google同期用) */
   tombstones: string[];
+  /** 家計簿の記録(支出・収入)。形は api/_lib/money.ts の Transaction */
+  transactions: Record<string, IdRecord>;
+  /** バイト先・クレジットカードの設定。形は api/_lib/money.ts の Profile */
+  profiles: Record<string, IdRecord>;
   updated_at: string;
 }
 
-export type Collection = 'events' | 'tasks' | 'plans' | 'categories' | 'tombstones';
+export type IdRecord = Record<string, unknown> & { id: string };
+
+export type Collection = 'events' | 'tasks' | 'plans' | 'categories' | 'tombstones' | 'transactions' | 'profiles';
 
 export type CloudOp =
   | { op: 'put'; collection: 'events'; record: CloudEvent }
-  | { op: 'put'; collection: 'tasks'; record: Record<string, unknown> & { id: string } }
+  | { op: 'put'; collection: 'tasks' | 'transactions' | 'profiles'; record: IdRecord }
   | { op: 'put'; collection: 'plans'; record: Record<string, unknown> & { date: string } }
   | { op: 'put'; collection: 'categories' | 'tombstones'; key: string }
   | { op: 'delete'; collection: Collection; key: string };
 
 export function emptyDoc(): CloudDoc {
-  return { version: 1, events: {}, tasks: {}, plans: {}, categories: [], tombstones: [], updated_at: new Date(0).toISOString() };
+  return { version: 1, events: {}, tasks: {}, plans: {}, categories: [], tombstones: [], transactions: {}, profiles: {}, updated_at: new Date(0).toISOString() };
 }
 
-const COLLECTIONS: Collection[] = ['events', 'tasks', 'plans', 'categories', 'tombstones'];
+const COLLECTIONS: Collection[] = ['events', 'tasks', 'plans', 'categories', 'tombstones', 'transactions', 'profiles'];
 
 /** 受け取った op の形をざっと確かめる(不正なものは捨てる) */
 export function isCloudOp(value: unknown): value is CloudOp {
@@ -55,13 +61,17 @@ export function applyOps(doc: CloudDoc, ops: CloudOp[], now = new Date()): Cloud
     plans: { ...doc.plans },
     categories: [...doc.categories],
     tombstones: [...doc.tombstones],
+    // 家計簿ができる前に保存されたデータには無いので、空として扱う
+    transactions: { ...(doc.transactions ?? {}) },
+    profiles: { ...(doc.profiles ?? {}) },
   };
   for (const op of ops) {
     if (op.op === 'put') {
       if (op.collection === 'events') next.events[op.record.id] = op.record;
-      else if (op.collection === 'tasks') next.tasks[op.record.id] = op.record;
+      else if (op.collection === 'tasks' || op.collection === 'transactions' || op.collection === 'profiles')
+        next[op.collection][op.record.id] = op.record;
       else if (op.collection === 'plans') next.plans[op.record.date] = op.record;
-      else if (!next[op.collection].includes(op.key)) next[op.collection].push(op.key);
+      else if ('key' in op && !next[op.collection].includes(op.key)) next[op.collection].push(op.key);
     } else if (op.collection === 'categories' || op.collection === 'tombstones') {
       next[op.collection] = next[op.collection].filter((k) => k !== op.key);
     } else {

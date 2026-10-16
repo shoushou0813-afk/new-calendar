@@ -1,8 +1,9 @@
 import type { EventRow } from '../types/event';
 import type { DayPlan, Task } from '../types/task';
+import type { Profile, Transaction } from '../../api/_lib/money';
 
 const DB_NAME = 'calendar-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const EVENTS_STORE = 'events';
 const CATEGORIES_STORE = 'categories';
 const TASKS_STORE = 'tasks';
@@ -11,14 +12,19 @@ const PLANS_STORE = 'plans';
 const GOOGLE_TOMBSTONES_STORE = 'google_tombstones';
 /** ネットに送る前の変更(送れたら消す)。オフラインでも変更を失わないためにここに貯める。 */
 const OUTBOX_STORE = 'cloud_outbox';
+/** 家計簿の記録と、バイト先・カードの設定 */
+const TRANSACTIONS_STORE = 'transactions';
+const PROFILES_STORE = 'profiles';
 
-export type LocalCollection = 'events' | 'tasks' | 'plans' | 'categories' | 'tombstones';
+export type LocalCollection = 'events' | 'tasks' | 'plans' | 'categories' | 'tombstones' | 'transactions' | 'profiles';
 
 /** この端末で起きた変更。ネット保存(cloudSync)が受け取って、サーバーに送る。 */
 export type LocalChange =
   | { kind: 'put'; collection: 'events'; value: EventRow }
   | { kind: 'put'; collection: 'tasks'; value: Task }
   | { kind: 'put'; collection: 'plans'; value: DayPlan }
+  | { kind: 'put'; collection: 'transactions'; value: Transaction }
+  | { kind: 'put'; collection: 'profiles'; value: Profile }
   | { kind: 'put'; collection: 'categories' | 'tombstones'; value: string }
   | { kind: 'delete'; collection: LocalCollection; value: string };
 
@@ -54,6 +60,12 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
         db.createObjectStore(OUTBOX_STORE, { autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(TRANSACTIONS_STORE)) {
+        db.createObjectStore(TRANSACTIONS_STORE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(PROFILES_STORE)) {
+        db.createObjectStore(PROFILES_STORE, { keyPath: 'id' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -152,24 +164,56 @@ export async function dbRemoveGoogleTombstone(id: string): Promise<void> {
   notify({ kind: 'delete', collection: 'tombstones', value: id });
 }
 
+export async function dbGetAllTransactions(): Promise<Transaction[]> {
+  return withStore<Transaction[]>(TRANSACTIONS_STORE, 'readonly', (store) => store.getAll() as IDBRequest<Transaction[]>);
+}
+
+export async function dbPutTransaction(tx: Transaction): Promise<void> {
+  await withStore(TRANSACTIONS_STORE, 'readwrite', (store) => store.put(tx));
+  notify({ kind: 'put', collection: 'transactions', value: tx });
+}
+
+export async function dbDeleteTransaction(id: string): Promise<void> {
+  await withStore(TRANSACTIONS_STORE, 'readwrite', (store) => store.delete(id));
+  notify({ kind: 'delete', collection: 'transactions', value: id });
+}
+
+export async function dbGetAllProfiles(): Promise<Profile[]> {
+  return withStore<Profile[]>(PROFILES_STORE, 'readonly', (store) => store.getAll() as IDBRequest<Profile[]>);
+}
+
+export async function dbPutProfile(profile: Profile): Promise<void> {
+  await withStore(PROFILES_STORE, 'readwrite', (store) => store.put(profile));
+  notify({ kind: 'put', collection: 'profiles', value: profile });
+}
+
+export async function dbDeleteProfile(id: string): Promise<void> {
+  await withStore(PROFILES_STORE, 'readwrite', (store) => store.delete(id));
+  notify({ kind: 'delete', collection: 'profiles', value: id });
+}
+
 export interface LocalSnapshot {
   events: EventRow[];
   tasks: Task[];
   plans: DayPlan[];
   categories: string[];
   tombstones: string[];
+  transactions: Transaction[];
+  profiles: Profile[];
 }
 
 /** この端末のデータを丸ごと読む(ネットへ初めて送るときに使う) */
 export async function dbReadSnapshot(): Promise<LocalSnapshot> {
-  const [events, tasks, plans, categories, tombstones] = await Promise.all([
+  const [events, tasks, plans, categories, tombstones, transactions, profiles] = await Promise.all([
     dbGetAllEvents(),
     dbGetAllTasks(),
     dbGetAllPlans(),
     dbGetAllCategories(),
     dbGetGoogleTombstones(),
+    dbGetAllTransactions(),
+    dbGetAllProfiles(),
   ]);
-  return { events, tasks, plans, categories, tombstones };
+  return { events, tasks, plans, categories, tombstones, transactions, profiles };
 }
 
 /**
@@ -178,7 +222,7 @@ export async function dbReadSnapshot(): Promise<LocalSnapshot> {
  */
 export async function dbReplaceAll(snapshot: LocalSnapshot): Promise<void> {
   const db = await openDb();
-  const stores = [EVENTS_STORE, TASKS_STORE, PLANS_STORE, CATEGORIES_STORE, GOOGLE_TOMBSTONES_STORE];
+  const stores = [EVENTS_STORE, TASKS_STORE, PLANS_STORE, CATEGORIES_STORE, GOOGLE_TOMBSTONES_STORE, TRANSACTIONS_STORE, PROFILES_STORE];
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(stores, 'readwrite');
     for (const name of stores) tx.objectStore(name).clear();
@@ -187,6 +231,8 @@ export async function dbReplaceAll(snapshot: LocalSnapshot): Promise<void> {
     for (const p of snapshot.plans) tx.objectStore(PLANS_STORE).put(p);
     for (const name of snapshot.categories) tx.objectStore(CATEGORIES_STORE).put({ name });
     for (const id of snapshot.tombstones) tx.objectStore(GOOGLE_TOMBSTONES_STORE).put({ id });
+    for (const t of snapshot.transactions) tx.objectStore(TRANSACTIONS_STORE).put(t);
+    for (const p of snapshot.profiles) tx.objectStore(PROFILES_STORE).put(p);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

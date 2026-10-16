@@ -6,9 +6,10 @@
  * - アプリを開いたとき・画面に戻ったとき・1分ごとに、サーバーの最新データを取ってきて置き換える。
  *   Claude がサーバーに書き込んだ予定やタスクも、これで端末に届く。
  */
-import { applyOps, emptyDoc, type CloudDoc, type CloudEvent, type CloudOp } from '../../../api/_lib/cloudDoc';
+import { applyOps, emptyDoc, type CloudDoc, type CloudEvent, type CloudOp, type IdRecord } from '../../../api/_lib/cloudDoc';
 import type { EventRow } from '../../types/event';
 import type { DayPlan, Task } from '../../types/task';
+import type { Profile, Transaction } from '../../../api/_lib/money';
 import {
   dbOutboxAdd,
   dbOutboxAll,
@@ -85,6 +86,9 @@ async function changeToOp(change: LocalChange): Promise<CloudOp> {
       return { op: 'put', collection: 'tasks', record: change.value as unknown as Record<string, unknown> & { id: string } };
     case 'plans':
       return { op: 'put', collection: 'plans', record: change.value as unknown as Record<string, unknown> & { date: string } };
+    case 'transactions':
+    case 'profiles':
+      return { op: 'put', collection: change.collection, record: change.value as unknown as IdRecord };
     default:
       return { op: 'put', collection: change.collection, key: change.value };
   }
@@ -100,6 +104,10 @@ async function snapshotToOps(snapshot: LocalSnapshot, onlyMissingFrom?: CloudDoc
     if (!doc || !doc.plans[p.date]) ops.push({ op: 'put', collection: 'plans', record: p as unknown as Record<string, unknown> & { date: string } });
   for (const c of snapshot.categories) if (!doc || !doc.categories.includes(c)) ops.push({ op: 'put', collection: 'categories', key: c });
   for (const id of snapshot.tombstones) if (!doc || !doc.tombstones.includes(id)) ops.push({ op: 'put', collection: 'tombstones', key: id });
+  for (const t of snapshot.transactions)
+    if (!doc || !doc.transactions[t.id]) ops.push({ op: 'put', collection: 'transactions', record: t as unknown as IdRecord });
+  for (const p of snapshot.profiles)
+    if (!doc || !doc.profiles[p.id]) ops.push({ op: 'put', collection: 'profiles', record: p as unknown as IdRecord });
   return ops;
 }
 
@@ -110,6 +118,8 @@ async function docToSnapshot(doc: CloudDoc): Promise<LocalSnapshot> {
     plans: Object.values(doc.plans) as unknown as DayPlan[],
     categories: doc.categories,
     tombstones: doc.tombstones,
+    transactions: Object.values(doc.transactions ?? {}) as unknown as Transaction[],
+    profiles: Object.values(doc.profiles ?? {}) as unknown as Profile[],
   };
 }
 

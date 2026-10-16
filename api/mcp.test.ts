@@ -47,7 +47,25 @@ describe('/api/mcp', () => {
 
     const tools = await rpc('tools/list', {});
     expect(tools.body.result.tools.map((t: { name: string }) => t.name).sort()).toEqual(
-      ['add_event', 'add_task', 'delete_event', 'delete_task', 'list_events', 'list_tasks', 'update_event', 'update_task'],
+      [
+        'add_event',
+        'add_task',
+        'add_transaction',
+        'delete_event',
+        'delete_money_setting',
+        'delete_task',
+        'delete_transaction',
+        'list_events',
+        'list_money_settings',
+        'list_tasks',
+        'list_transactions',
+        'money_summary',
+        'set_card',
+        'set_job',
+        'update_event',
+        'update_task',
+        'update_transaction',
+      ],
     );
 
     const added = await rpc('tools/call', { name: 'add_event', arguments: { title: 'スタジオ練習', date: '2026-10-21', start: '16:50', end: '22:10' } });
