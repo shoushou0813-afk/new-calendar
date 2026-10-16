@@ -3,13 +3,13 @@ import { addDays, differenceInCalendarDays, format, isToday, parseISO, startOfTo
 import { ja } from 'date-fns/locale';
 import { usePlans } from '../../hooks/usePlans';
 import { forecastDays, type ForecastDay } from '../../lib/planner/forecast';
-import { toHHmm, toMinutes, totalMinutes } from '../../lib/planner/freeSlots';
+import { toMinutes, totalMinutes } from '../../lib/planner/freeSlots';
 import { planLocally, type PlanResult } from '../../lib/planner/localPlanner';
 import { buildPlanningContext } from '../../lib/planner/planningContext';
 import type { AppSettings } from '../../lib/settings';
 import type { EventDraft, EventRow } from '../../types/event';
 import type { DayPlan, PlanItem, Task, TaskDraft } from '../../types/task';
-import { DayTimeline } from './DayTimeline';
+import { DayFlow } from './DayFlow';
 import { DayTodoCard, formatMinutes } from './DayTodoCard';
 import { QuickScheduleDialog } from './QuickScheduleDialog';
 import { DeadlineImportDialog } from './DeadlineImportDialog';
@@ -232,28 +232,6 @@ export function TodoPage(props: TodoPageProps) {
           </div>
         </div>
 
-        {range === 'day' && (
-          <>
-            <span className="todo-free">
-              空き時間 {formatMinutes(freeToday)}
-              {context.slots.length > 0 && `(${context.slots.map((s) => `${toHHmm(s.start)}〜${toHHmm(s.end)}`).join('、')})`}
-            </span>
-            <div className="todo-plan-actions">
-              <button type="button" onClick={() => generate('ai')} disabled={planning !== null || activeTasks.length === 0}>
-                {planning === 'ai' ? 'AIが計画中...' : 'AIで計画し直す'}
-              </button>
-              <button type="button" className="todo-secondary" onClick={() => generate('local')} disabled={planning !== null || activeTasks.length === 0}>
-                {planning === 'local' ? '計算中...' : '自動で組み直す'}
-              </button>
-              {!settings.anthropicApiKey && (
-                <button type="button" className="todo-link" onClick={props.onOpenSettings}>
-                  APIキーを設定
-                </button>
-              )}
-            </div>
-          </>
-        )}
-
         {error && <p className="todo-error">{error}</p>}
         {notice && <p className="todo-notice">{notice}</p>}
         {undo && (
@@ -277,10 +255,6 @@ export function TodoPage(props: TodoPageProps) {
             {activeTasks.length === 0 && (
               <p className="todo-hint">締切のあるやることは、下の「タスク」に追加すると空き時間に自動で入ります。</p>
             )}
-            <p className="todo-summary">
-              <span className="todo-badge">{today.source === 'forecast' ? '自動の見込み' : plan?.generated_by === 'ai' ? 'AI' : '自動'}</span>
-              {plan?.summary}
-            </p>
             {plan && plan.warnings.length > 0 && (
               <ul className="todo-warnings">
                 {plan.warnings.map((w, i) => (
@@ -288,16 +262,33 @@ export function TodoPage(props: TodoPageProps) {
                 ))}
               </ul>
             )}
-            <DayTimeline day={today} events={events} breakMinutes={settings.breakMinutes} onToggle={(d, i) => void handleToggle(d, i)} />
-            <button type="button" className="todo-secondary" onClick={() => setShowQuick(true)}>
-              1日の流れをまとめて入力
-            </button>
-            {today.items.length > 0 && (
-              <button type="button" className="todo-secondary" onClick={() => void addPlanToCalendar()}>
-                この日のやることをカレンダーに入れる
-              </button>
-            )}
+            <DayFlow day={today} events={events} now={new Date()} onToggle={(d, i) => void handleToggle(d, i)} />
             <WeekSummary title="1週間でやること" days={weekDays} tasks={tasks} onComplete={(id) => void completeTask(id)} />
+            <details className="todo-more">
+              <summary>組み直し・その他</summary>
+              <span className="todo-free">空き時間 {formatMinutes(freeToday)}</span>
+              <div className="todo-plan-actions">
+                <button type="button" className="todo-secondary" onClick={() => generate('local')} disabled={planning !== null || activeTasks.length === 0}>
+                  {planning === 'local' ? '計算中...' : '自動で組み直す'}
+                </button>
+                <button type="button" className="todo-secondary" onClick={() => generate('ai')} disabled={planning !== null || activeTasks.length === 0}>
+                  {planning === 'ai' ? 'AIが計画中...' : 'AIで計画し直す'}
+                </button>
+                {!settings.anthropicApiKey && (
+                  <button type="button" className="todo-link" onClick={props.onOpenSettings}>
+                    APIキーを設定
+                  </button>
+                )}
+                <button type="button" className="todo-secondary" onClick={() => setShowQuick(true)}>
+                  1日の流れをまとめて入力
+                </button>
+                {today.items.length > 0 && (
+                  <button type="button" className="todo-secondary" onClick={() => void addPlanToCalendar()}>
+                    やることをカレンダーに入れる
+                  </button>
+                )}
+              </div>
+            </details>
           </>
         ) : (
           <>
@@ -312,7 +303,7 @@ export function TodoPage(props: TodoPageProps) {
             </p>
             <div className="day-todo-list">
               {days.map((d) => (
-                <DayTodoCard key={d.date} day={d} compact breakMinutes={settings.breakMinutes} onToggle={(day, i) => void handleToggle(day, i)} />
+                <DayTodoCard key={d.date} day={d} compact onToggle={(day, i) => void handleToggle(day, i)} />
               ))}
             </div>
           </>
