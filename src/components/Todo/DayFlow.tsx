@@ -5,13 +5,15 @@ import { buildDayFlow } from '../../lib/planner/dayFlow';
 import type { ForecastDay } from '../../lib/planner/forecast';
 import { groupByTask } from '../../lib/planner/groupItems';
 import type { EventRow } from '../../types/event';
-import type { PlanItem } from '../../types/task';
+import type { PlanItem, Task } from '../../types/task';
 import { formatMinutes } from './DayTodoCard';
 import './Todo.css';
 
 interface DayFlowProps {
   day: ForecastDay;
   events: EventRow[];
+  /** 完了した課題の締切は出さないため */
+  tasks: Task[];
   /** 今の時刻(締切の過ぎた予定を出さないため) */
   now: Date;
   onToggle: (day: ForecastDay, items: PlanItem[]) => void;
@@ -21,11 +23,17 @@ interface DayFlowProps {
  * 大まかな1日の流れ。細かい時刻は出さず、決まっている予定(授業など)の間に「ここでこれをやる」を並べる。
  * 同じタスクは1行にまとめ、チェックするとその日の分が終わったことになる。
  */
-export function DayFlow({ day, events, now, onToggle }: DayFlowProps) {
+export function DayFlow({ day, events, tasks, now, onToggle }: DayFlowProps) {
   const [showDone, setShowDone] = useState(false);
   const blocks = buildDayFlow(day.date, day.items, events);
   const doneGroups = groupByTask(day.doneItems);
-  const isToday = formatDate(now) === day.date;
+  const todayStr = formatDate(now);
+  const isToday = todayStr === day.date;
+  const doneTitles = tasks.filter((t) => t.done).map((t) => normalize(t.title));
+  const isDoneDeadline = (title: string) => {
+    const n = normalize(title);
+    return doneTitles.some((d) => d && n && (d.includes(n) || n.includes(d)));
+  };
   const nowHHmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
   const dayEvents = events.filter((e) => eventOccursOn(e, day.date) && !e.task_id);
@@ -39,7 +47,9 @@ export function DayFlow({ day, events, now, onToggle }: DayFlowProps) {
         return { key: e.id, title: taskTitleFromEvent(e.title), time };
       }),
     ...day.deadlines.map((t) => ({ key: t.id, title: t.title, time: t.deadline_time })),
-  ].filter((d) => !(isToday && d.time && d.time <= nowHHmm));
+  ]
+    // 過ぎた日・過ぎた時刻の締切、完了にした課題の締切は出さない
+    .filter((d) => day.date >= todayStr && !(isToday && d.time && d.time <= nowHHmm) && !isDoneDeadline(d.title));
 
   return (
     <div className="flow">
@@ -119,4 +129,9 @@ export function DayFlow({ day, events, now, onToggle }: DayFlowProps) {
 
 function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 締切の予定名と課題名を比べるため、空白・かっこ・記号をそろえる */
+function normalize(title: string): string {
+  return title.replace(/[\s　（）()【】「」・、,.:：]/g, '').toLowerCase();
 }

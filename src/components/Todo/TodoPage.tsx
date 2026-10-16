@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, differenceInCalendarDays, format, isToday, parseISO, startOfToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { usePlans } from '../../hooks/usePlans';
@@ -52,7 +52,27 @@ function loadRange(): Range {
 export function TodoPage(props: TodoPageProps) {
   const { events, tasks, settings } = props;
   // Todoは今日を基本にする(カレンダーで選んだ日付とは別。‹ › で移動できる)
-  const [date, setDate] = useState(startOfToday);
+  const [date, setDateState] = useState(startOfToday);
+  // 自分で別の日に移動していなければ、日付が変わったら(翌朝アプリを開いたときなど)今日に合わせる
+  const followToday = useRef(true);
+  const setDate = (next: Date | ((d: Date) => Date)) => {
+    setDateState((d) => {
+      const value = typeof next === 'function' ? next(d) : next;
+      followToday.current = isToday(value);
+      return value;
+    });
+  };
+  useEffect(() => {
+    const sync = () => {
+      if (followToday.current && document.visibilityState === 'visible') setDateState((d) => (isToday(d) ? d : startOfToday()));
+    };
+    document.addEventListener('visibilitychange', sync);
+    const timer = setInterval(sync, 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', sync);
+      clearInterval(timer);
+    };
+  }, []);
   const [showQuick, setShowQuick] = useState(false);
   const dateKey = format(date, 'yyyy-MM-dd');
   const { plans, savePlan: persistPlan } = usePlans();
@@ -91,7 +111,6 @@ export function TodoPage(props: TodoPageProps) {
     [range, days, dateKey, tasks, events, settings, plans],
   );
   const today = days[0];
-  const plan = today?.plan ?? null;
   const activeTasks = tasks.filter((t) => !t.done);
   const doneTasks = tasks.filter((t) => t.done);
 
@@ -255,14 +274,7 @@ export function TodoPage(props: TodoPageProps) {
             {activeTasks.length === 0 && (
               <p className="todo-hint">締切のあるやることは、下の「タスク」に追加すると空き時間に自動で入ります。</p>
             )}
-            {plan && plan.warnings.length > 0 && (
-              <ul className="todo-warnings">
-                {plan.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            )}
-            <DayFlow day={today} events={events} now={new Date()} onToggle={(d, i) => void handleToggle(d, i)} />
+            <DayFlow day={today} events={events} tasks={tasks} now={new Date()} onToggle={(d, i) => void handleToggle(d, i)} />
             <WeekSummary title="1週間でやること" days={weekDays} tasks={tasks} onComplete={(id) => void completeTask(id)} />
             <details className="todo-more">
               <summary>組み直し・その他</summary>
